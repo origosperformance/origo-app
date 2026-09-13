@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ORIGO — Reservá tu turno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #10161A;
+    --surface: #1A2226;
+    --surface-2: #212B30;
+    --line: #2C373C;
+    --green: #2F6FED;
+    --green-dim: #1E3A73;
+    --amber: #F2A93B;
+    --red: #E1584F;
+    --text: #F3F6F1;
+    --text-muted: #93A19C;
+    --radius: 3px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .stat, .num, h1, h2, .brand {
+    font-family: 'Oswald', 'Arial Narrow', sans-serif;
+  }
+  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+  /* ---------- Login ---------- */
+  .login-screen {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 32px 28px; gap: 28px;
+  }
+  .login-screen .brand-block { text-align: left; }
+  .brand {
+    font-size: 34px; font-weight: 700; letter-spacing: 0.5px; margin: 0;
+    color: var(--text);
+  }
+  .brand span { color: var(--green); }
+  .tagline { color: var(--text-muted); margin: 6px 0 0; font-size: 14px; letter-spacing: 0.3px; }
+  .login-form { display: flex; flex-direction: column; gap: 12px; }
+  .login-form label { font-size: 13px; color: var(--text-muted); }
+  input[type=text], input[type=password] {
+    background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    padding: 14px 14px; border-radius: var(--radius); font-size: 17px; font-family: inherit;
+    outline: none;
+  }
+  input[type=text]:focus, input[type=password]:focus { border-color: var(--green); }
+  .btn {
+    border: none; border-radius: var(--radius); padding: 14px 18px; font-size: 15px;
+    font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer;
+    transition: transform 0.08s ease, background 0.15s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--green); color: #F3F6F1; }
+  .btn-primary:hover { background: #4A82F0; }
+  .btn-primary:disabled { background: var(--green-dim); color: #5C6E93; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+  .error-text { color: var(--red); font-size: 13px; min-height: 16px; }
+  .demo-hint { color: var(--text-muted); font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); padding-top: 16px; }
+  .demo-hint b { color: var(--text); }
+  .link-btn {
+    background: none; border: none; color: var(--text-muted); font-size: 13px;
+    text-decoration: underline; cursor: pointer; padding: 0; text-align: left; font-family: 'Inter', sans-serif;
+  }
+
+  /* ---------- Admin ---------- */
+  .admin-field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .admin-field-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-muted); }
+  .admin-field-grid label.span2 { grid-column: 1 / -1; }
+  .admin-field-grid input, .admin-field-grid select {
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 10px 10px; border-radius: var(--radius); font-size: 14px; font-family: inherit; outline: none;
+    width: 100%; min-width: 0;
+  }
+  .admin-field-grid input:focus, .admin-field-grid select:focus { border-color: var(--green); }
+  .admin-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .admin-row {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .admin-row-name { font-size: 14px; font-weight: 500; }
+  .admin-row-dni { font-size: 12px; color: var(--text-muted); font-weight: 400; }
+  .admin-row-meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+  .admin-row-asist { font-size: 11px; color: var(--text-muted); margin-top: 4px; opacity: 0.8; }
+  .admin-row-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .estado-select {
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; border-radius: 20px;
+    padding: 5px 10px 5px 12px; border: 1px solid transparent; cursor: pointer; outline: none;
+    appearance: none; -webkit-appearance: none;
+  }
+  .estado-select.estado-activo { background: rgba(47,111,237,0.18); color: var(--green); }
+  .estado-select.estado-pausado { background: rgba(242,169,59,0.18); color: var(--amber); }
+  .estado-select.estado-baja { background: rgba(225,88,79,0.18); color: var(--red); }
+  .estado-select option { background: var(--surface-2); color: var(--text); }
+
+  /* ---------- Admin tabs ---------- */
+  .admin-tabs { display: flex; gap: 6px; margin: 4px 0 20px; border-bottom: 1px solid var(--line); }
+  .admin-tab {
+    background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 500;
+    padding: 10px 4px; cursor: pointer; font-family: 'Inter', sans-serif; position: relative; margin-right: 18px;
+  }
+  .admin-tab.active { color: var(--text); }
+  .admin-tab.active::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--green);
+  }
+
+  /* ---------- Resumen ---------- */
+  .resumen-atencion-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .resumen-atencion-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: var(--surface); border: none; border-left: 3px solid var(--line);
+    border-radius: var(--radius); padding: 12px 14px; cursor: pointer; text-align: left;
+    font-family: 'Inter', sans-serif;
+  }
+  .resumen-atencion-item.sev-urgente { border-left-color: var(--red); }
+  .resumen-atencion-item.sev-atencion { border-left-color: var(--amber); }
+  .resumen-atencion-num {
+    font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 700; color: var(--text);
+    min-width: 28px;
+  }
+  .sev-urgente .resumen-atencion-num { color: var(--red); }
+  .sev-atencion .resumen-atencion-num { color: var(--amber); }
+  .resumen-atencion-label { flex: 1; font-size: 13px; color: var(--text); line-height: 1.35; }
+  .resumen-atencion-arrow { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .resumen-todobien {
+    background: rgba(47,111,237,0.08); border: 1px solid var(--line); border-left: 3px solid var(--green);
+    border-radius: var(--radius); padding: 14px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px;
+  }
+  .resumen-hero {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; text-align: center; margin-bottom: 14px;
+  }
+  .resumen-hero-label { font-size: 12px; color: var(--text-muted); }
+  .resumen-hero-num { font-family: 'Oswald', sans-serif; font-size: 38px; font-weight: 700; margin: 6px 0; }
+  .resumen-hero-sub { font-size: 12px; color: var(--text-muted); }
+  .resumen-hoy-card {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; font-family: 'Inter', sans-serif;
+  }
+  .resumen-hoy-card:hover { border-color: var(--green); }
+  .resumen-hoy-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .resumen-hoy-titulo { font-size: 13px; color: var(--text-muted); }
+  .resumen-hoy-ver { font-size: 12px; color: var(--green); font-weight: 600; }
+  .resumen-hoy-stats { display: flex; gap: 28px; }
+  .resumen-hoy-stat { display: flex; flex-direction: column; }
+  .resumen-hoy-num { font-family: 'Oswald', sans-serif; font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .resumen-hoy-txt { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ---------- Cuotas ---------- */
+  .cuota-list { display: flex; flex-direction: column; gap: 10px; }
+  .cuota-aldiacolapso { margin-top: 20px; }
+  .cuota-aldiacolapso summary {
+    font-size: 14px; color: var(--text-muted); cursor: pointer; padding: 10px 0;
+    list-style: none; display: flex; align-items: center; gap: 6px;
+  }
+  .cuota-aldiacolapso summary::-webkit-details-marker { display: none; }
+  .cuota-aldiacolapso summary::before { content: '▸'; font-size: 11px; }
+  .cuota-aldiacolapso[open] summary::before { content: '▾'; }
+  .cuota-aldiacolapso .cuota-card { opacity: 0.7; }
+  .cuota-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .cuota-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .cuota-nombre { font-size: 14px; font-weight: 600; }
+  .pago-detalle { font-size: 12px; color: var(--text-muted); }
+  .pago-registrar { display: flex; gap: 8px; margin-top: 10px; }
+  .metodo-select, .duracion-select {
+    flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 8px 8px; border-radius: var(--radius); font-size: 12px; font-family: inherit;
+  }
+
+  /* ---------- Asistencias ---------- */
+  .date-input {
+    background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    padding: 10px 12px; border-radius: var(--radius); font-size: 14px; font-family: inherit;
+    margin-bottom: 16px; width: 100%;
+  }
+  .asist-list { display: flex; flex-direction: column; gap: 8px; }
+  .asist-group {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 4px 14px 8px; margin-bottom: 12px;
+  }
+  .asist-group-header {
+    font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 600;
+    padding: 10px 0 8px; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 8px;
+  }
+  .asist-group-count { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 400; color: var(--text-muted); }
+  .asist-row {
+    padding: 10px 0; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--line);
+  }
+  .asist-group .asist-row:last-child { border-bottom: none; }
+  .asist-nombre-solo { font-size: 14px; }
+  .asist-actions { display: flex; gap: 6px; }
+  .asist-btn {
+    font-size: 11px; font-weight: 600; padding: 7px 10px; border-radius: var(--radius);
+    border: 1px solid var(--line); background: transparent; color: var(--text-muted); cursor: pointer;
+  }
+  .asist-btn.asist-si.active { background: rgba(47,111,237,0.18); border-color: var(--green); color: var(--green); }
+  .asist-btn.asist-no.active { background: rgba(225,88,79,0.18); border-color: var(--red); color: var(--red); }
+
+  /* ---------- App shell ---------- */
+  .app-header {
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .app-header .who { display: flex; flex-direction: column; }
+  .app-header .who .name { font-size: 15px; font-weight: 600; }
+  .app-header .who .plan { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .logout-btn {
+    background: none; border: 1px solid var(--line); color: var(--text-muted); font-size: 11px;
+    padding: 5px 10px; border-radius: 20px; cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .logout-btn:hover { border-color: var(--red); color: var(--red); }
+  .pill {
+    font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+    letter-spacing: 0.2px; white-space: nowrap;
+  }
+  .pill-green { background: rgba(47,111,237,0.18); color: var(--green); }
+  .pill-amber { background: rgba(242,169,59,0.18); color: var(--amber); }
+  .pill-red   { background: rgba(225,88,79,0.18); color: var(--red); }
+
+  .view { flex: 1; overflow-y: auto; padding: 20px 20px 90px; }
+  .view h2 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
+  .view .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
+
+  /* ---------- Perfil ---------- */
+  .banner {
+    border-left: 3px solid var(--red); background: rgba(225,88,79,0.1);
+    padding: 12px 14px; border-radius: var(--radius); font-size: 13px; margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .banner b { display: block; margin-bottom: 2px; color: var(--red); font-size: 13px; }
+  .profile-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 16px;
+  }
+  .profile-card .plan-name { font-size: 24px; font-weight: 600; margin: 0; }
+  .profile-card .price { font-size: 32px; font-weight: 700; margin: 6px 0 2px; }
+  .profile-card .price small { font-size: 14px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
+  .divider { height: 1px; background: var(--line); margin: 16px 0; }
+  .kv-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+  .kv-row .k { color: var(--text-muted); }
+  .kv-row .v { font-weight: 500; text-align: right; max-width: 60%; }
+  .estimulos-grid { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .estimulo-chip {
+    background: var(--surface-2); border-radius: var(--radius); padding: 8px 12px;
+    font-size: 12px; color: var(--text-muted); flex: 1; min-width: 90px; text-align: center;
+  }
+  .estimulo-chip .num { display: block; font-size: 20px; color: var(--text); font-weight: 600; }
+
+  /* ---------- Turnos ---------- */
+  .date-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px; }
+  .date-chip {
+    flex: 0 0 auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px 14px; text-align: center; cursor: pointer; min-width: 58px;
+  }
+  .date-chip .dow { display: block; font-size: 11px; color: var(--text-muted); text-transform: lowercase; }
+  .date-chip .dnum { display: block; font-size: 18px; font-weight: 600; font-family: 'Oswald', sans-serif; margin-top: 2px; }
+  .date-chip.active { background: var(--green); border-color: var(--green); }
+  .date-chip.active .dow, .date-chip.active .dnum { color: #F3F6F1; }
+  .date-chip.past { cursor: default; opacity: 0.35; }
+  .date-chip.past .dow, .date-chip.past .dnum { color: var(--text-muted); }
+  .asist-atajos { display: flex; gap: 8px; margin-bottom: 14px; }
+  .asist-atajos .date-chip {
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--text);
+    border: 1px solid var(--line); padding: 9px 16px;
+  }
+  .asist-atajos .date-chip.active { color: #F3F6F1; }
+
+  .slot-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 4px; border-bottom: 1px solid var(--line);
+  }
+  .slot-row .hora { font-size: 20px; font-weight: 600; font-family: 'Oswald', sans-serif; min-width: 64px; }
+  .slot-row .avail { font-size: 12px; color: var(--text-muted); }
+  .slot-row .avail.full { color: var(--red); }
+  .slot-btn {
+    font-size: 13px; font-weight: 600; padding: 9px 16px; border-radius: var(--radius);
+    border: 1px solid var(--green); background: transparent; color: var(--green); cursor: pointer;
+  }
+  .slot-btn:disabled { border-color: var(--line); color: var(--text-muted); cursor: not-allowed; }
+  .slot-btn.booked { background: var(--surface-2); border-color: var(--line); color: var(--text-muted); cursor: pointer; }
+  .slot-btn.booked:hover { border-color: var(--red); color: var(--red); }
+
+  /* ---------- Mis reservas ---------- */
+  .res-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .res-card .info .date-line { font-size: 15px; font-weight: 600; }
+  .res-card .info .day-line { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .res-card .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .cancel-link { font-size: 12px; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
+  .empty-state { text-align: center; color: var(--text-muted); font-size: 14px; padding: 60px 20px; line-height: 1.6; }
+
+  /* ---------- Rutina ---------- */
+  .rutina-card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+    text-decoration: none; color: inherit;
+  }
+  .rutina-card:hover { border-color: var(--green); }
+  .rutina-card-titulo { font-size: 15px; font-weight: 600; color: var(--text); }
+  .rutina-card-fecha { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .rutina-card-arrow { font-size: 12px; font-weight: 600; color: var(--green); white-space: nowrap; }
+
+  /* ---------- Admin: Rutinas por cliente ---------- */
+  .rutinas-panel {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; margin-top: 10px;
+  }
+  .rutina-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .rutina-row:last-of-type { border-bottom: none; }
+  .rutina-row a { color: var(--green); text-decoration: none; }
+  .rutina-add-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .rutina-add-form input {
+    background: var(--surface); border: 1px solid var(--line); color: var(--text);
+    padding: 9px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit;
+  }
+
+  /* ---------- Nav ---------- */
+  .bottom-nav {
+    position: sticky; bottom: 0; display: flex; border-top: 1px solid var(--line);
+    background: var(--bg);
+  }
+  .nav-btn {
+    flex: 1; background: none; border: none; color: var(--text-muted); padding: 12px 0 10px;
+    font-size: 11px; font-family: 'Inter', sans-serif; cursor: pointer; display: flex;
+    flex-direction: column; align-items: center; gap: 4px; letter-spacing: 0.2px;
+  }
+  .nav-btn .dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
+  .nav-btn.active { color: var(--text); }
+  .nav-btn.active .dot { background: var(--green); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(10px);
+    background: var(--surface-2); border: 1px solid var(--green); color: var(--text);
+    padding: 10px 18px; border-radius: var(--radius); font-size: 13px; opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; white-space: nowrap;
+    max-width: 90%; text-overflow: ellipsis; overflow: hidden;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  ::-webkit-scrollbar { height: 0; width: 0; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const SUPABASE_URL = 'https://fvimyumzqvbzjzhpdhme.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_L4D-Q3B6IzbuiQSvunwWiA_3MUlzrVa';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const CUPO = 6;
+  const MAX_TURNOS_POR_DIA = 2;
+  const HORARIOS = Array.from({length: 13}, (_, i) => String(i + 8).padStart(2,'0') + ':00');
+  const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const DIAS_CORTO = ['dom','lun','mar','mié','jue','vie','sáb'];
+
+  const DEFAULT_CLIENTES = [
+    { dni: '30111222', password: '1234', nombre: 'Juan Pérez', email: 'juan.perez@mail.com', telefono: '341-1234567', plan: 'START', precio: 90000,
+      dias: 4, estimulos: { fuerza: 4, resistencia: 0, velocidad: 0 }, estado: 'Activo' },
+    { dni: '28555666', password: '1234', nombre: 'Jose de San Martín', email: 'jose.sanmartin@mail.com', telefono: '341-2345678', plan: 'PRO', precio: 125000,
+      dias: null, estimulos: null, estado: 'Activo' },
+    { dni: '25999888', password: '1234', nombre: 'Angel Di María', email: 'angel.dimaria@mail.com', telefono: '341-3456789', plan: 'PERFORMANCE 2', precio: 95000,
+      dias: 3, estimulos: { fuerza: 2, resistencia: 2, velocidad: 0 }, estado: 'Activo' },
+    { dni: '27444333', password: '1234', nombre: 'Zorro Coccaro', email: 'zorro.coccaro@mail.com', telefono: '341-4567890', plan: 'PERFORMANCE 3', precio: 105000,
+      dias: 3, estimulos: { fuerza: 3, resistencia: 1, velocidad: 2 }, estado: 'Pausado' },
+  ];
+
+  const ADMIN_PIN = 'ORIGO2026';
+  const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Débito automático'];
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const MATRICULA_PRECIO = 30000;
+  const MAX_DIAS_PAUSA = 90; // ~3 meses
+  const DURACIONES = [
+    { id: '15d', label: '15 días', dias: 15, factor: 0.5 },
+    { id: '1m',  label: '1 mes',   dias: 30, factor: 1 },
+    { id: '3m',  label: '3 meses', dias: 90, factor: 3 },
+    { id: '6m',  label: '6 meses', dias: 180, factor: 6 },
+  ];
+
+  // Copia de DEFAULT_CLIENTES con matrícula/pausa ya cargadas, para que la demo se vea realista
+  function seedClientesIniciales() {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const addDias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return isoDate(d); };
+    const clientes = JSON.parse(JSON.stringify(DEFAULT_CLIENTES));
+    clientes.forEach(c => {
+      c.matricula = { pagada: true, fechaPago: addDias(-60) };
+      c.pausadoDesde = null;
+      c.rutinas = [];
+    });
+    const zorro = clientes.find(c => c.dni === '27444333');
+    if (zorro) zorro.pausadoDesde = addDias(-40); // lleva 40 días pausado, dentro del límite de 90
+    return clientes;
+  }
+
+  function seedPagosIniciales() {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const addDias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return isoDate(d); };
+    return [
+      { id: 'seed-1', dni: '30111222', fechaPago: addDias(-5), duracionId: '1m', dias: 30, monto: 90000, metodoPago: 'Efectivo', fechaVencimiento: addDias(25) },
+      { id: 'seed-2', dni: '28555666', fechaPago: addDias(-2), duracionId: '1m', dias: 30, monto: 125000, metodoPago: 'Transferencia', fechaVencimiento: addDias(28) },
+      { id: 'seed-3', dni: '27444333', fechaPago: addDias(-40), duracionId: '1m', dias: 30, monto: 105000, metodoPago: 'Efectivo', fechaVencimiento: addDias(-10) },
+      // Angel Di María queda a propósito "Sin pagos" para mostrar ese estado
+    ];
+  }
+
+  const PRECIOS = {
+    'START':          { 1: 55000, 2: 70000, 3: 80000,  4: 90000,  5: 100000 },
+    'PERFORMANCE 2':  {           2: 85000, 3: 95000,  4: 105000, 5: 115000 },
+    'PERFORMANCE 3':  {           2: 95000, 3: 105000, 4: 115000, 5: 120000 },
+    'PRO':            { null: 125000 },
+  };
+
+  function precioDe(plan, dias) {
+    const tabla = PRECIOS[plan] || {};
+    return tabla[dias] ?? tabla[null] ?? null;
+  }
+
+  let state = {
+    data: null,
+    cliente: null,
+    view: 'perfil',
+    selectedDate: null,
+    mode: 'login', // login | adminPin | admin
+    loginError: '',
+    pinError: '',
+    adminFormError: '',
+    adminFormNotice: '',
+    adminTab: 'resumen', // resumen | clientes | cuotas | asistencias
+    editingDni: null,      // dni del cliente en edición, null = alta nueva
+    asistenciasFecha: null,
+    clienteBusqueda: '',
+    rutinasAbiertoDni: null,
+  };
+
+  function isoDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  // Lunes de la semana a la que pertenece una fecha (ISO string)
+  function mondayOf(fechaIso) {
+    const d = new Date(fechaIso + 'T00:00:00');
+    const dow = d.getDay(); // 0 domingo .. 6 sábado
+    const diff = dow === 0 ? -6 : 1 - dow;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  // Días hábiles reservables: de hoy a viernes de esta semana.
+  // Si hoy es sábado o domingo, muestra la semana próxima completa (lunes a viernes).
+  function bookableWeekdays() {
+    return fullBookableWeek().filter(d => d >= todayMidnight());
+  }
+
+  function todayMidnight() {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }
+
+  // Los 5 días (lunes a viernes) de la semana reservable, incluyendo los que ya pasaron
+  function fullBookableWeek() {
+    const today = todayMidnight();
+    const dow = today.getDay();
+    let monday = new Date(today);
+    if (dow === 0) monday.setDate(today.getDate() + 1);
+    else if (dow === 6) monday.setDate(today.getDate() + 2);
+    else monday.setDate(today.getDate() - (dow - 1));
+
+    const out = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      out.push(d);
+    }
+    return out;
+  }
+
+  // Total de reservas activas de un cliente dentro de la semana (lun-vie) de 'fechaIso'
+  function reservasEnSemana(data, dni, fechaIso) {
+    const monday = mondayOf(fechaIso);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    const mondayIso = isoDate(monday);
+    const fridayIso = isoDate(friday);
+    return data.reservas.filter(r =>
+      r.dni === dni && r.estado !== 'cancelado' && r.fecha >= mondayIso && r.fecha <= fridayIso);
+  }
+
+  // Cuántos turnos por semana tiene derecho a reservar este cliente
+  function limiteSemanalDe(cliente) {
+    if (cliente.limiteSemanalOverride != null) return cliente.limiteSemanalOverride;
+    if (!cliente.estimulos) return Infinity; // PRO u otros planes integrales
+    return cliente.estimulos.fuerza + cliente.estimulos.resistencia + cliente.estimulos.velocidad;
+  }
+
+  // ---------------- Capa de datos (Supabase) ----------------
+
+  function clienteDbToJs(row, rutinasPorDni) {
+    return {
+      dni: row.dni, password: row.password, nombre: row.nombre, email: row.email, telefono: row.telefono,
+      plan: row.plan, precio: row.precio, dias: row.dias,
+      estimulos: row.estimulo_fuerza === null ? null : {
+        fuerza: row.estimulo_fuerza, resistencia: row.estimulo_resistencia, velocidad: row.estimulo_velocidad,
+      },
+      estado: row.estado,
+      limiteSemanalOverride: row.limite_semanal_override,
+      matricula: { pagada: row.matricula_pagada, fechaPago: row.matricula_fecha_pago },
+      pausadoDesde: row.pausado_desde,
+      rutinas: (rutinasPorDni && rutinasPorDni[row.dni]) || [],
+    };
+  }
+
+  function clienteJsToDb(c) {
+    return {
+      dni: c.dni, password: c.password, nombre: c.nombre, email: c.email || null, telefono: c.telefono || null,
+      plan: c.plan, precio: c.precio, dias: c.dias,
+      estimulo_fuerza: c.estimulos ? c.estimulos.fuerza : null,
+      estimulo_resistencia: c.estimulos ? c.estimulos.resistencia : null,
+      estimulo_velocidad: c.estimulos ? c.estimulos.velocidad : null,
+      estado: c.estado,
+      limite_semanal_override: c.limiteSemanalOverride,
+      matricula_pagada: !!(c.matricula && c.matricula.pagada),
+      matricula_fecha_pago: c.matricula ? c.matricula.fechaPago : null,
+      pausado_desde: c.pausadoDesde,
+    };
+  }
+
+  function pagoDbToJs(p) {
+    return {
+      id: p.id, dni: p.dni, fechaPago: p.fecha_pago, duracionId: p.duracion_id, dias: p.dias,
+      monto: p.monto, metodoPago: p.metodo_pago, fechaVencimiento: p.fecha_vencimiento,
+    };
+  }
+
+  function pagoJsToDb(p) {
+    return {
+      id: p.id, dni: p.dni, fecha_pago: p.fechaPago, duracion_id: p.duracionId, dias: p.dias,
+      monto: p.monto, metodo_pago: p.metodoPago, fecha_vencimiento: p.fechaVencimiento,
+    };
+  }
+
+  async function sembrarDatosIniciales() {
+    const clientesSeed = seedClientesIniciales();
+    const pagosSeed = seedPagosIniciales();
+    await sb.from('clientes').insert(clientesSeed.map(clienteJsToDb));
+    await sb.from('pagos').insert(pagosSeed.map(pagoJsToDb));
+  }
+
+  async function refreshData() {
+    const [clientesRes, reservasRes, pagosRes, rutinasRes] = await Promise.all([
+      sb.from('clientes').select('*'),
+      sb.from('reservas').select('*'),
+      sb.from('pagos').select('*'),
+      sb.from('rutinas').select('*'),
+    ]);
+
+    if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error) {
+      const primerError = clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error;
+      console.error('Error leyendo Supabase:', primerError.message || primerError);
+      showToast('Error de base de datos: ' + (primerError.message || 'desconocido'));
+      state.data = state.data || { clientes: [], reservas: [], pagos: [] };
+      return;
+    }
+
+    // Primera vez que se usa la base: no hay clientes, sembramos los de ejemplo
+    if (clientesRes.data.length === 0) {
+      await sembrarDatosIniciales();
+      return refreshData();
+    }
+
+    const rutinasPorDni = {};
+    rutinasRes.data.forEach(r => {
+      (rutinasPorDni[r.dni] = rutinasPorDni[r.dni] || []).push({ id: r.id, titulo: r.titulo, url: r.url, fecha: r.fecha });
+    });
+
+    state.data = {
+      clientes: clientesRes.data.map(row => clienteDbToJs(row, rutinasPorDni)),
+      reservas: reservasRes.data.map(r => ({ id: r.id, dni: r.dni, fecha: r.fecha, hora: r.hora, estado: r.estado })),
+      pagos: pagosRes.data.map(pagoDbToJs),
+    };
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  function pillForEstado(estado) {
+    if (estado === 'Activo') return '<span class="pill pill-green">Activo</span>';
+    if (estado === 'Pausado') return '<span class="pill pill-amber">Pausado</span>';
+    return '<span class="pill pill-red">Baja</span>';
+  }
+
+  function money(n) {
+    return '$' + n.toLocaleString('es-AR');
+  }
+
+  // ---------------- Render: Login ----------------
+  function renderLogin(errorMsg) {
+    return `
+      <div class="login-screen">
+        <div class="brand-block">
+          <h1 class="brand">ORIGO<span>.</span></h1>
+          <p class="tagline">Rendimiento deportivo — reservá tu turno</p>
+        </div>
+        <div class="login-form">
+          <label for="dniInput">Tu DNI</label>
+          <input type="text" id="dniInput" inputmode="numeric" placeholder="Ej: 30111222" autocomplete="off" />
+          <label for="passInput">Contraseña</label>
+          <input type="password" id="passInput" placeholder="••••" autocomplete="off" />
+          <div class="error-text">${errorMsg || ''}</div>
+          <button class="btn btn-primary" id="loginBtn">Entrar</button>
+        </div>
+        <div class="demo-hint">
+          <b>Prototipo de prueba.</b> Usuarios de ejemplo (contraseña <b>1234</b> para todos):
+          30111222 (Juan, activo), 25999888 (Ángel, activo), 27444333 (Zorro, pausado — para ver
+          cómo se bloquea la reserva).
+        </div>
+        <button class="link-btn" id="adminLinkBtn">Acceso administrador</button>
+      </div>
+    `;
+  }
+
+  function renderAdminPin(errorMsg) {
+    return `
+      <div class="login-screen">
+        <div class="brand-block">
+          <h1 class="brand">ORIGO<span>.</span></h1>
+          <p class="tagline">Panel de administración</p>
+        </div>
+        <div class="login-form">
+          <label for="pinInput">Clave de administrador</label>
+          <input type="password" id="pinInput" placeholder="••••••••" autocomplete="off" />
+          <div class="error-text">${errorMsg || ''}</div>
+          <button class="btn btn-primary" id="pinBtn">Entrar</button>
+        </div>
+        <button class="link-btn" id="backToLoginBtn">← Volver</button>
+      </div>
+    `;
+  }
+
+  function renderAdminTabs(tab) {
+    const tabs = [
+      { id: 'resumen', label: 'Resumen' },
+      { id: 'clientes', label: 'Clientes' },
+      { id: 'cuotas', label: 'Cuotas' },
+      { id: 'asistencias', label: 'Asistencias' },
+    ];
+    return `
+      <div class="admin-tabs">
+        ${tabs.map(t => `<button class="admin-tab ${t.id===tab?'active':''}" data-admin-tab="${t.id}">${t.label}</button>`).join('')}
+      </div>`;
+  }
+
+  function renderAdmin(data, formError, formNotice) {
+    let body;
+    if (state.adminTab === 'cuotas') body = renderAdminCuotas(data);
+    else if (state.adminTab === 'asistencias') body = renderAdminAsistencias(data);
+    else if (state.adminTab === 'resumen') body = renderAdminResumen(data);
+    else body = renderAdminClientes(data, formError, formNotice);
+
+    return `
+      <div class="view" style="padding-bottom:40px;">
+        <h2>Administración</h2>
+        ${renderAdminTabs(state.adminTab)}
+        ${body}
+        <button class="link-btn" id="backToLoginBtn2" style="margin-top:24px;">← Salir de administración</button>
+      </div>
+    `;
+  }
+
+  // ---------------- Admin: Resumen ----------------
+  function renderAdminResumen(data) {
+    const activos = data.clientes.filter(c => c.estado === 'Activo');
+    const pausados = data.clientes.filter(c => c.estado === 'Pausado');
+    const bajas = data.clientes.filter(c => c.estado === 'Baja');
+
+    const facturacionProyectada = activos.reduce((sum, c) => sum + (c.precio || 0), 0);
+
+    const cuentasDisplay = data.clientes.map(c => cuotaDisplay(data, c.dni));
+    const vencidos = cuentasDisplay.filter(e => e.estado === 'Vencido').length;
+    const sinPagos = cuentasDisplay.filter(e => e.estado === 'Sin pagos').length;
+    const vencePronto = cuentasDisplay.filter(e => e.prioridad === 1).length;
+
+    const hoy = isoDate(new Date());
+    const turnosHoy = data.reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
+    const asistieronHoy = data.reservas.filter(r => r.fecha === hoy && r.estado === 'asistio').length;
+
+    const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
+    const sinMatricula = data.clientes.filter(c => !(c.matricula && c.matricula.pagada)).length;
+
+    // Lista de cosas que requieren una decisión o acción, ordenadas por urgencia
+    const itemsAtencion = [
+      { count: vencidos + sinPagos, label: (vencidos+sinPagos)===1 ? 'cliente con la cuenta vencida o sin pagos' : 'clientes con la cuenta vencida o sin pagos', tab: 'cuotas', sev: 'urgente' },
+      { count: pausasVencidas, label: pausasVencidas===1 ? 'pausa superó el límite de 3 meses' : 'pausas superaron el límite de 3 meses', tab: 'clientes', sev: 'urgente' },
+      { count: vencePronto, label: vencePronto===1 ? 'cliente vence esta semana' : 'clientes vencen esta semana', tab: 'cuotas', sev: 'atencion' },
+      { count: sinMatricula, label: sinMatricula===1 ? 'cliente sin matrícula pagada' : 'clientes sin matrícula pagada', tab: 'clientes', sev: 'atencion' },
+    ].filter(i => i.count > 0);
+
+    const atencionHtml = itemsAtencion.length
+      ? itemsAtencion.map(i => `
+          <button class="resumen-atencion-item sev-${i.sev}" data-jump-tab="${i.tab}">
+            <span class="resumen-atencion-num">${i.count}</span>
+            <span class="resumen-atencion-label">${i.label}</span>
+            <span class="resumen-atencion-arrow">Ver →</span>
+          </button>`).join('')
+      : `<div class="resumen-todobien">Todo en orden — no hay nada urgente para hoy.</div>`;
+
+    return `
+        <p class="sub">Qué necesita tu atención hoy</p>
+
+        <div class="resumen-atencion-list">${atencionHtml}</div>
+
+        <div class="resumen-hero">
+          <div class="resumen-hero-label">Facturación proyectada este mes</div>
+          <div class="resumen-hero-num">${money(facturacionProyectada)}</div>
+          <div class="resumen-hero-sub">${activos.length} activos · ${pausados.length} pausados · ${bajas.length} de baja</div>
+        </div>
+
+        <button class="resumen-hoy-card" data-jump-tab="asistencias">
+          <div class="resumen-hoy-top">
+            <span class="resumen-hoy-titulo">Hoy</span>
+            <span class="resumen-hoy-ver">Ver en Asistencias →</span>
+          </div>
+          <div class="resumen-hoy-stats">
+            <div class="resumen-hoy-stat"><span class="resumen-hoy-num">${turnosHoy}</span><span class="resumen-hoy-txt">reservados</span></div>
+            <div class="resumen-hoy-stat"><span class="resumen-hoy-num">${asistieronHoy}</span><span class="resumen-hoy-txt">asistieron</span></div>
+          </div>
+        </button>
+
+        <h2 style="font-size:16px; margin-top:24px;">Datos</h2>
+        <button class="btn btn-ghost" id="backupBtn" style="width:100%;">Descargar copia de seguridad (.json)</button>
+        <button class="btn btn-ghost" id="seedMananaBtn" style="width:100%; margin-top:8px;">Anotar clientes activos a turnos de mañana (prueba)</button>
+    `;
+  }
+
+  function asistenciaMesResumen(data, dni) {
+    const hoy = new Date();
+    const mesActual = hoy.getMonth();
+    const anioActual = hoy.getFullYear();
+    const asistencias = data.reservas.filter(r => {
+      if (r.dni !== dni || r.estado !== 'asistio') return false;
+      const d = new Date(r.fecha + 'T00:00:00');
+      return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+    }).sort((a, b) => b.fecha.localeCompare(a.fecha));
+    return { cantidad: asistencias.length, ultima: asistencias[0] ? asistencias[0].fecha : null };
+  }
+
+  function renderAdminClientes(data, formError, formNotice) {
+    const editing = state.editingDni ? data.clientes.find(c => c.dni === state.editingDni) : null;
+
+    const q = state.clienteBusqueda.trim().toLowerCase();
+    const clientesFiltrados = q
+      ? data.clientes.filter(c => c.nombre.toLowerCase().includes(q) || c.dni.includes(q))
+      : data.clientes;
+
+    const filas = clientesFiltrados.map(c => {
+      const asist = asistenciaMesResumen(data, c.dni);
+      const asistTexto = asist.cantidad > 0
+        ? `Asistió ${asist.cantidad} ${asist.cantidad === 1 ? 'vez' : 'veces'} este mes · última: ${formatFechaCorta(asist.ultima)}`
+        : 'Sin asistencias este mes';
+
+      const matriculaHtml = (c.matricula && c.matricula.pagada)
+        ? `<div class="admin-row-asist">Matrícula pagada el ${formatFechaCorta(c.matricula.fechaPago)}</div>`
+        : `<div class="admin-row-asist" style="color:var(--red);">Matrícula sin pagar ·
+             <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(MATRICULA_PRECIO)})</button>
+           </div>`;
+
+      let pausaHtml = '';
+      if (c.estado === 'Pausado' && c.pausadoDesde) {
+        const dias = diasPausado(c);
+        const vencida = dias > MAX_DIAS_PAUSA;
+        pausaHtml = `<div class="admin-row-asist" style="${vencida?'color:var(--red); font-weight:600;':''}">${
+          vencida
+            ? `Pausado hace ${dias} días — superó el límite de 3 meses`
+            : `Pausado hace ${dias} días (máximo ${MAX_DIAS_PAUSA})`
+        }</div>`;
+      }
+
+      const rutinasCount = (c.rutinas || []).length;
+      const rutinasAbierto = state.rutinasAbiertoDni === c.dni;
+      const rutinasPanel = rutinasAbierto ? `
+        <div class="rutinas-panel">
+          ${(c.rutinas||[]).map(r => `
+            <div class="rutina-row">
+              <a href="${r.url}" target="_blank" rel="noopener">${r.titulo}</a>
+              <button class="cancel-link" data-del-rutina="${c.dni}|${r.id}">Eliminar</button>
+            </div>`).join('') || '<div style="font-size:12px;color:var(--text-muted);">Sin rutinas cargadas todavía.</div>'}
+          <div class="rutina-add-form">
+            <input type="text" id="rutinaTitulo-${c.dni}" placeholder="Título (ej: Fuerza - Septiembre)">
+            <input type="text" id="rutinaUrl-${c.dni}" placeholder="Link de Google Sheets / Drive">
+            <button class="slot-btn" data-add-rutina="${c.dni}">Agregar rutina</button>
+          </div>
+        </div>` : '';
+
+      return `
+      <div class="admin-row">
+        <div class="admin-row-info">
+          <div class="admin-row-name">${c.nombre} <span class="admin-row-dni">· DNI ${c.dni}</span></div>
+          <div class="admin-row-meta">${c.plan}${c.telefono ? ' · ' + c.telefono : ''}</div>
+          <div class="admin-row-asist">${asistTexto}</div>
+          ${matriculaHtml}
+          ${pausaHtml}
+        </div>
+        <div class="admin-row-actions">
+          <select class="estado-select estado-${c.estado.toLowerCase()}" data-estado-dni="${c.dni}">
+            <option value="Activo" ${c.estado==='Activo'?'selected':''}>Activo</option>
+            <option value="Pausado" ${c.estado==='Pausado'?'selected':''}>Pausado</option>
+            <option value="Baja" ${c.estado==='Baja'?'selected':''}>Baja</option>
+          </select>
+          <button class="cancel-link" data-toggle-rutinas="${c.dni}">Rutinas (${rutinasCount})</button>
+          <button class="cancel-link" data-edit-dni="${c.dni}">Editar</button>
+          <button class="cancel-link" data-del-dni="${c.dni}">Eliminar</button>
+        </div>
+      </div>
+      ${rutinasPanel}
+    `;
+    }).join('') || `<div class="empty-state">Ningún cliente coincide con "${state.clienteBusqueda}".</div>`;
+
+    return `
+        <p class="sub">${editing ? 'Editando a ' + editing.nombre : 'Cargá un cliente nuevo con sus datos de acceso'}</p>
+
+        <div class="profile-card" style="margin-bottom:24px;">
+          <div class="admin-field-grid">
+            <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 30111222" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
+            <label>Contraseña<input type="text" id="fPass" placeholder="Ej: 1234" value="${editing?editing.password:''}"></label>
+            <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?editing.nombre:''}"></label>
+            <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email:''}"></label>
+            <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?editing.telefono||'':''}"></label>
+            <label>Plan
+              <select id="fPlan">
+                <option value="START" ${editing&&editing.plan==='START'?'selected':''}>START</option>
+                <option value="PERFORMANCE 2" ${editing&&editing.plan==='PERFORMANCE 2'?'selected':''}>PERFORMANCE 2</option>
+                <option value="PERFORMANCE 3" ${editing&&editing.plan==='PERFORMANCE 3'?'selected':''}>PERFORMANCE 3</option>
+                <option value="PRO" ${editing&&editing.plan==='PRO'?'selected':''}>PRO</option>
+              </select>
+            </label>
+            <label>Días presenciales / sem
+              <select id="fDias" ${editing&&editing.plan==='PRO'?'disabled':''}>
+                <option value="1" ${editing&&editing.dias===1?'selected':''}>1</option>
+                <option value="2" ${editing&&editing.dias===2?'selected':''}>2</option>
+                <option value="3" ${(!editing&&true)||(editing&&editing.dias===3)?'selected':''}>3</option>
+                <option value="4" ${editing&&editing.dias===4?'selected':''}>4</option>
+                <option value="5" ${editing&&editing.dias===5?'selected':''}>5</option>
+              </select>
+            </label>
+            <label>Estímulos Fuerza<input type="number" id="fFuerza" min="0" max="10" value="${editing&&editing.estimulos?editing.estimulos.fuerza:0}"></label>
+            <label>Estímulos Resistencia<input type="number" id="fResistencia" min="0" max="10" value="${editing&&editing.estimulos?editing.estimulos.resistencia:0}"></label>
+            <label>Estímulos Velocidad<input type="number" id="fVelocidad" min="0" max="10" value="${editing&&editing.estimulos?editing.estimulos.velocidad:0}"></label>
+            <label>Estado
+              <select id="fEstado">
+                <option value="Activo" ${!editing||editing.estado==='Activo'?'selected':''}>Activo</option>
+                <option value="Pausado" ${editing&&editing.estado==='Pausado'?'selected':''}>Pausado</option>
+                <option value="Baja" ${editing&&editing.estado==='Baja'?'selected':''}>Baja</option>
+              </select>
+            </label>
+            <label class="span2">Límite semanal de turnos (excepción)
+              <input type="number" id="fLimiteSemanal" min="0" max="20" placeholder="Vacío = automático según estímulos contratados"
+                value="${editing&&editing.limiteSemanalOverride!=null?editing.limiteSemanalOverride:''}">
+            </label>
+          </div>
+          ${!editing ? `
+          <div class="divider"></div>
+          <div class="admin-field-grid">
+            <label>Pago inicial
+              <select id="fDuracionPago">
+                <option value="">Sin pago inicial (registrar después)</option>
+                ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label}</option>`).join('')}
+              </select>
+            </label>
+            <label>Método de pago
+              <select id="fMetodoPago">
+                ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
+              </select>
+            </label>
+            <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
+              <input type="checkbox" id="fMatriculaPagada" style="width:auto;">
+              Matrícula pagada (${money(MATRICULA_PRECIO)})
+            </label>
+          </div>
+          ` : ''}
+          <div class="divider"></div>
+          <div class="kv-row"><span class="k">Cuota calculada</span><span class="v" id="fPrecioPreview">—</span></div>
+          <div class="error-text">${formError || ''}</div>
+          ${formNotice ? `<div class="banner" style="border-color:var(--green); background:rgba(47,111,237,0.1);"><b style="color:var(--green);">Listo</b>${formNotice}</div>` : ''}
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn btn-primary" id="addClienteBtn" style="flex:1;">${editing ? 'Guardar cambios' : 'Agregar cliente'}</button>
+            ${editing ? `<button class="btn btn-ghost" id="cancelEditBtn">Cancelar</button>` : ''}
+          </div>
+        </div>
+
+        <h2 style="font-size:16px;">Clientes cargados (${clientesFiltrados.length}${q ? ' de ' + data.clientes.length : ''})</h2>
+        <input type="text" id="clienteBuscar" class="date-input" placeholder="Buscar por nombre o DNI..." value="${state.clienteBusqueda}" style="margin-bottom:12px;">
+        <div class="admin-list">${filas}</div>
+    `;
+  }
+
+  // ---------------- Admin: Cuotas ----------------
+  function ultimoPagoDe(data, dni) {
+    const pagos = data.pagos.filter(p => p.dni === dni).sort((a, b) => b.fechaVencimiento.localeCompare(a.fechaVencimiento));
+    return pagos[0] || null;
+  }
+
+  function estadoCuenta(data, dni) {
+    const ultimo = ultimoPagoDe(data, dni);
+    if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, ultimo: null };
+    const hoy = isoDate(new Date());
+    return { estado: hoy > ultimo.fechaVencimiento ? 'Vencido' : 'Al día', vencimiento: ultimo.fechaVencimiento, ultimo };
+  }
+
+  const DIAS_AVISO_VENCIMIENTO = 7;
+
+  // Como estadoCuenta pero con prioridad de atención: 0 = urgente (vencido/sin pagos),
+  // 1 = vence pronto (dentro de los próximos 7 días), 2 = tranquilo (al día, con margen)
+  function cuotaDisplay(data, dni) {
+    const cuenta = estadoCuenta(data, dni);
+    if (cuenta.estado === 'Vencido') return { ...cuenta, label: 'Vencido', pill: 'pill-red', prioridad: 0, diasRestantes: null };
+    if (cuenta.estado === 'Sin pagos') return { ...cuenta, label: 'Sin pagos', pill: 'pill-red', prioridad: 0, diasRestantes: null };
+    const hoy = todayMidnight();
+    const venc = new Date(cuenta.vencimiento + 'T00:00:00');
+    const diasRestantes = Math.round((venc - hoy) / 86400000);
+    if (diasRestantes <= DIAS_AVISO_VENCIMIENTO) {
+      return { ...cuenta, label: 'Vence pronto', pill: 'pill-amber', prioridad: 1, diasRestantes };
+    }
+    return { ...cuenta, label: 'Al día', pill: 'pill-green', prioridad: 2, diasRestantes };
+  }
+
+  async function registrarNuevoPago(dni, duracionId, metodoPago) {
+    const dur = DURACIONES.find(d => d.id === duracionId);
+    const cliente = state.data.clientes.find(c => c.dni === dni);
+    if (!dur || !cliente) return;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const venc = new Date(hoy);
+    venc.setDate(venc.getDate() + dur.dias);
+    const monto = Math.round((cliente.precio || 0) * dur.factor);
+    const nuevoPago = {
+      id: 'pago-' + dni + '-' + Date.now(),
+      dni, fechaPago: isoDate(hoy), duracionId, dias: dur.dias, monto, metodoPago,
+      fechaVencimiento: isoDate(venc),
+    };
+    const { error } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+    if (error) { showToast('No se pudo registrar el pago.'); console.error(error); return; }
+    await refreshData();
+    showToast('Pago registrado: ' + dur.label + ' · vence ' + formatFechaCorta(isoDate(venc)));
+    renderApp();
+  }
+
+  async function eliminarPago(pagoId) {
+    const { error } = await sb.from('pagos').delete().eq('id', pagoId);
+    if (error) { showToast('No se pudo eliminar el pago.'); console.error(error); return; }
+    await refreshData();
+    showToast('Pago eliminado');
+    renderApp();
+  }
+
+  function renderAdminCuotas(data) {
+    const card = (c) => {
+      const cuenta = cuotaDisplay(data, c.dni);
+      const infoVencimiento = cuenta.ultimo
+        ? `<div class="kv-row"><span class="k">${cuenta.estado === 'Vencido' ? 'Venció' : 'Vence'}</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${cuenta.diasRestantes!=null && cuenta.diasRestantes>=0 ? ' (' + cuenta.diasRestantes + (cuenta.diasRestantes===1?' día)':' días)') : ''}</span></div>
+           <div class="pago-detalle">Último pago: ${formatFechaCorta(cuenta.ultimo.fechaPago)} · ${DURACIONES.find(d=>d.id===cuenta.ultimo.duracionId)?.label || ''} · ${money(cuenta.ultimo.monto)} · ${cuenta.ultimo.metodoPago}
+             · <button class="cancel-link" data-eliminar-pago="${cuenta.ultimo.id}">Deshacer este pago</button>
+           </div>`
+        : `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
+
+      return `
+        <div class="cuota-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">${c.nombre}</div>
+            <span class="pill ${cuenta.pill}">${cuenta.label}</span>
+          </div>
+          ${infoVencimiento}
+          <div class="pago-registrar">
+            <select class="duracion-select" data-duracion-dni="${c.dni}">
+              ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label} — ${money(Math.round(c.precio*d.factor))}</option>`).join('')}
+            </select>
+            <select class="metodo-select" data-metodo-dni="${c.dni}">
+              ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+          </div>
+          <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>
+        </div>`;
+    };
+
+    const urgentes = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 0);
+    const proximos = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 1);
+    const alDia = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 2);
+
+    const seccion = (titulo, lista) => lista.length
+      ? `<h2 style="font-size:15px; margin-top:20px;">${titulo} (${lista.length})</h2><div class="cuota-list">${lista.map(card).join('')}</div>`
+      : '';
+
+    const alDiaHtml = alDia.length
+      ? `<details class="cuota-aldiacolapso">
+           <summary>Al día — sin nada pendiente (${alDia.length})</summary>
+           <div class="cuota-list" style="margin-top:10px;">${alDia.map(card).join('')}</div>
+         </details>`
+      : '';
+
+    const vencidos = urgentes.length;
+
+    return `
+        <p class="sub">Estado de cuentas${vencidos ? ' — ' + vencidos + ' necesitan atención' : ''}</p>
+        ${seccion('Necesitan atención', urgentes)}
+        ${seccion('Vencen esta semana', proximos)}
+        ${alDiaHtml}
+    `;
+  }
+
+  // ---------------- Admin: Asistencias ----------------
+  function renderAdminAsistencias(data) {
+    const fecha = state.asistenciasFecha || isoDate(new Date());
+    const hoy = isoDate(new Date());
+    const esFuturo = fecha > hoy;
+
+    const turnosDelDia = data.reservas.filter(r => r.fecha === fecha && r.estado !== 'cancelado');
+
+    const agruparPorHora = (lista) => {
+      const map = {};
+      lista.forEach(r => { (map[r.hora] = map[r.hora] || []).push(r); });
+      return Object.keys(map).sort().map(hora => ({ hora, items: map[hora] }));
+    };
+
+    // Chips de acceso rápido: Hoy / Mañana
+    const manana = new Date(hoy + 'T00:00:00');
+    manana.setDate(manana.getDate() + 1);
+    const atajos = `
+      <div class="asist-atajos">
+        <button class="date-chip ${fecha===hoy?'active':''}" data-fecha-atajo="${hoy}">Hoy</button>
+        <button class="date-chip ${fecha===isoDate(manana)?'active':''}" data-fecha-atajo="${isoDate(manana)}">Mañana</button>
+      </div>`;
+
+    if (esFuturo) {
+      // Modo vista previa: solo para ver quién se anotó, sin botones de confirmar
+      const grupos = agruparPorHora(turnosDelDia);
+      const totalHtml = turnosDelDia.length
+        ? `<div class="kv-row"><span class="k">Total anotados</span><span class="v">${turnosDelDia.length} ${turnosDelDia.length===1?'persona':'personas'}</span></div>`
+        : '';
+      const listaHtml = grupos.length
+        ? grupos.map(g => `
+            <div class="asist-group">
+              <div class="asist-group-header">${g.hora} <span class="asist-group-count">${g.items.length} ${g.items.length===1?'persona':'personas'}</span></div>
+              ${g.items.map(r => {
+                const cliente = data.clientes.find(c => c.dni === r.dni);
+                return `<div class="asist-row"><span class="asist-nombre-solo">${cliente ? cliente.nombre : r.dni}</span></div>`;
+              }).join('')}
+            </div>`).join('')
+        : `<div class="empty-state">Todavía nadie se anotó para este día.</div>`;
+
+      return `
+        <p class="sub">Vista previa — todavía no pasó, solo podés ver quién se anotó</p>
+        ${atajos}
+        <input type="date" id="asistFechaInput" value="${fecha}" class="date-input" />
+        <div class="profile-card" style="margin-bottom:16px;">${totalHtml || '<div class="pago-detalle">Todavía nadie se anotó para este día.</div>'}</div>
+        ${listaHtml}
+      `;
+    }
+
+    // Modo confirmación: hoy o fechas pasadas
+    const pendientes = turnosDelDia.filter(r => r.estado === 'reservado');
+    const confirmados = turnosDelDia.filter(r => r.estado !== 'reservado');
+
+    const renderGrupo = (hora, items) => {
+      const filasHtml = items.map(r => {
+        const cliente = data.clientes.find(c => c.dni === r.dni);
+        const nombre = cliente ? cliente.nombre : r.dni;
+        return `
+          <div class="asist-row">
+            <span class="asist-nombre-solo">${nombre}</span>
+            <div class="asist-actions">
+              <button class="asist-btn asist-si ${r.estado==='asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="asistio">Asistió</button>
+              <button class="asist-btn asist-no ${r.estado==='no_asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="no_asistio">No asistió</button>
+            </div>
+          </div>`;
+      }).join('');
+      return `
+        <div class="asist-group">
+          <div class="asist-group-header">${hora} <span class="asist-group-count">${items.length} ${items.length===1?'persona':'personas'}</span></div>
+          ${filasHtml}
+        </div>`;
+    };
+
+    const pendientesHtml = pendientes.length
+      ? agruparPorHora(pendientes).map(g => renderGrupo(g.hora, g.items)).join('')
+      : `<div class="empty-state">No quedan turnos sin confirmar para este día.</div>`;
+
+    const confirmadosHtml = confirmados.length
+      ? `<details class="cuota-aldiacolapso">
+           <summary>Ya confirmados (${confirmados.length})</summary>
+           <div style="margin-top:10px;">${agruparPorHora(confirmados).map(g => renderGrupo(g.hora, g.items)).join('')}</div>
+         </details>`
+      : '';
+
+    return `
+        <p class="sub">Marcá quién vino a cada turno</p>
+        ${atajos}
+        <input type="date" id="asistFechaInput" value="${fecha}" class="date-input" />
+        ${pendientesHtml}
+        ${confirmadosHtml}
+    `;
+  }
+
+  function formatFechaCorta(iso) {
+    const [y,m,d] = iso.split('-');
+    return d + '/' + m;
+  }
+  function renderPerfil(cliente, data) {
+    const bloqueado = cliente.estado !== 'Activo';
+    let estimulosHtml = '';
+    if (cliente.estimulos) {
+      estimulosHtml = `
+        <div class="estimulos-grid">
+          <div class="estimulo-chip"><span class="num">${cliente.estimulos.fuerza}</span>Fuerza / sem</div>
+          <div class="estimulo-chip"><span class="num">${cliente.estimulos.resistencia}</span>Resist. / sem</div>
+          <div class="estimulo-chip"><span class="num">${cliente.estimulos.velocidad}</span>Veloc. / sem</div>
+        </div>`;
+    }
+
+    const cuenta = estadoCuenta(data, cliente.dni);
+    let cuotaHtml = '';
+    let cuotaBanner = '';
+    if (cuenta.estado === 'Al día') {
+      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-green">Al día</span></span></div>
+                    <div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>`;
+    } else if (cuenta.estado === 'Vencido') {
+      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-red">Vencida</span></span></div>`;
+      cuotaBanner = `<div class="banner"><b>Cuota vencida</b>Tu cuota venció el ${formatFechaCorta(cuenta.vencimiento)}. Pasá por recepción para regularizarla.</div>`;
+    } else {
+      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-amber">Sin pagos</span></span></div>`;
+    }
+
+    return `
+      <div class="view">
+        <h2>Hola, ${cliente.nombre.split(' ')[0]}</h2>
+        <p class="sub">Tu perfil y tu plan en ORIGO</p>
+        ${bloqueado ? `<div class="banner"><b>Membresía ${cliente.estado.toLowerCase()}</b>Mientras tu membresía no esté activa no podés reservar turnos. Hablá con recepción para regularizarla.</div>` : ''}
+        ${cuotaBanner}
+        <div class="profile-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <p class="plan-name">${cliente.plan}</p>
+            ${pillForEstado(cliente.estado)}
+          </div>
+          <p class="price">${money(cliente.precio)}<small>/ mes</small></p>
+          <div class="divider"></div>
+          <div class="kv-row"><span class="k">Días presenciales</span><span class="v">${cliente.dias ? cliente.dias + ' por semana' : 'Integral — sin días fijos'}</span></div>
+          ${estimulosHtml}
+          <div class="divider"></div>
+          ${cuotaHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------------- Render: Rutina ----------------
+  function renderRutina(cliente) {
+    const rutinas = cliente.rutinas || [];
+    if (rutinas.length === 0) {
+      return `
+        <div class="view">
+          <h2>Tu rutina</h2>
+          <p class="sub">El plan que te armó tu profe</p>
+          <div class="empty-state">Todavía no tenés una rutina cargada.<br>Hablá con tu profe en ORIGO.</div>
+        </div>`;
+    }
+    const items = rutinas.map(r => `
+      <a class="rutina-card" href="${r.url}" target="_blank" rel="noopener">
+        <div class="rutina-card-info">
+          <div class="rutina-card-titulo">${r.titulo}</div>
+          <div class="rutina-card-fecha">Cargada el ${formatFechaCorta(r.fecha)}</div>
+        </div>
+        <span class="rutina-card-arrow">Abrir</span>
+      </a>`).join('');
+    return `
+      <div class="view">
+        <h2>Tu rutina</h2>
+        <p class="sub">El plan que te armó tu profe</p>
+        ${items}
+      </div>`;
+  }
+
+  // ---------------- Render: Turnos ----------------
+  function renderTurnos(cliente, data, selectedDate) {
+    const dates = fullBookableWeek();
+    const hoy = todayMidnight();
+    const dchips = dates.map(d => {
+      const iso = isoDate(d);
+      const active = iso === selectedDate ? 'active' : '';
+      const pasado = d < hoy;
+      return `<div class="date-chip ${active} ${pasado?'past':''}" ${pasado?'':`data-date="${iso}"`}>
+                <span class="dow">${DIAS_CORTO[d.getDay()]}</span>
+                <span class="dnum">${d.getDate()}</span>
+              </div>`;
+    }).join('');
+
+    const bloqueado = cliente.estado !== 'Activo';
+    const misReservasHoy = data.reservas.filter(r => r.dni === cliente.dni && r.fecha === selectedDate && r.estado !== 'cancelado');
+    const limiteDiarioAlcanzado = misReservasHoy.length >= MAX_TURNOS_POR_DIA;
+
+    const reservasSemana = reservasEnSemana(data, cliente.dni, selectedDate);
+    const limiteSemanal = limiteSemanalDe(cliente);
+    const limiteSemanalAlcanzado = reservasSemana.length >= limiteSemanal;
+
+    const slots = HORARIOS.map(hora => {
+      const ocupados = data.reservas.filter(r => r.fecha === selectedDate && r.hora === hora && r.estado !== 'cancelado').length;
+      const disponibles = CUPO - ocupados;
+      const miReserva = misReservasHoy.find(r => r.hora === hora);
+      let btn;
+      if (miReserva) {
+        btn = `<button class="slot-btn booked" data-desmarcar-id="${miReserva.id}">Desmarcar</button>`;
+      } else if (bloqueado) {
+        btn = `<button class="slot-btn" disabled>Reservar</button>`;
+      } else if (disponibles <= 0) {
+        btn = `<button class="slot-btn" disabled>Completo</button>`;
+      } else if (limiteSemanalAlcanzado) {
+        btn = `<button class="slot-btn" disabled>Límite semanal</button>`;
+      } else if (limiteDiarioAlcanzado) {
+        btn = `<button class="slot-btn" disabled>Límite diario</button>`;
+      } else {
+        btn = `<button class="slot-btn" data-hora="${hora}">Reservar</button>`;
+      }
+      return `
+        <div class="slot-row">
+          <span class="hora">${hora}</span>
+          <span class="avail ${disponibles<=0?'full':''}">${disponibles<=0?'Completo':disponibles+' de '+CUPO+' libres'}</span>
+          ${btn}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="view">
+        <h2>Turnos</h2>
+        <p class="sub">Elegí el día y la hora que te queda mejor</p>
+        <div class="date-scroll">${dchips}</div>
+        ${bloqueado ? `<div class="banner"><b>Membresía ${cliente.estado.toLowerCase()}</b>No podés reservar hasta regularizar tu membresía.</div>` : ''}
+        ${(!bloqueado && limiteSemanalAlcanzado) ? `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Límite semanal alcanzado</b>Ya reservaste los ${limiteSemanal} turnos que te corresponden esta semana según tu plan. Si necesitás uno extra por una situación puntual, hablalo con tu profe.</div>` : (!bloqueado && limiteDiarioAlcanzado) ? `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Límite diario alcanzado</b>Ya tenés ${MAX_TURNOS_POR_DIA} turnos este día. Desmarcá uno si querés cambiarlo por otro horario.</div>` : ''}
+        <div class="slots-list">${slots}</div>
+      </div>
+    `;
+  }
+
+  // ---------------- Render: Mis reservas ----------------
+  function renderMisReservas(cliente, data) {
+    const todas = data.reservas.filter(r => r.dni === cliente.dni && r.estado !== 'cancelado');
+    const hoy = isoDate(new Date());
+
+    const proximas = todas.filter(r => r.fecha >= hoy).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+    const historial = todas.filter(r => r.fecha < hoy).sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+
+    const card = (r, permitirCancelar) => {
+      const d = new Date(r.fecha + 'T00:00:00');
+      const dow = DIAS_SEMANA[d.getDay()];
+      let estadoPill = '';
+      if (r.estado === 'asistio') estadoPill = '<span class="pill pill-green">Asistió</span>';
+      else if (r.estado === 'no_asistio') estadoPill = '<span class="pill pill-red">No asistió</span>';
+      else estadoPill = '<span class="pill pill-amber">Reservado</span>';
+      const puedeCancelar = permitirCancelar && r.estado === 'reservado';
+      return `
+        <div class="res-card">
+          <div class="info">
+            <div class="date-line">${r.hora} · ${d.getDate()}/${d.getMonth()+1}</div>
+            <div class="day-line">${dow}</div>
+          </div>
+          <div class="right">
+            ${estadoPill}
+            ${puedeCancelar ? `<button class="cancel-link" data-id="${r.id}">Cancelar</button>` : ''}
+          </div>
+        </div>`;
+    };
+
+    if (todas.length === 0) {
+      return `
+        <div class="view">
+          <h2>Mis reservas</h2>
+          <p class="sub">Tus próximos turnos</p>
+          <div class="empty-state">Todavía no reservaste ningún turno.<br>Andá a la pestaña "Turnos" para anotarte.</div>
+        </div>`;
+    }
+
+    const proximasHtml = proximas.length
+      ? proximas.map(r => card(r, true)).join('')
+      : `<div class="empty-state" style="padding:24px 20px;">No tenés turnos próximos.</div>`;
+
+    const historialHtml = historial.length
+      ? `<h2 style="font-size:16px; margin-top:24px;">Historial</h2>` + historial.map(r => card(r, false)).join('')
+      : '';
+
+    return `
+      <div class="view">
+        <h2>Mis reservas</h2>
+        <p class="sub">Tus próximos turnos</p>
+        ${proximasHtml}
+        ${historialHtml}
+      </div>`;
+  }
+
+  function renderNav(view) {
+    const items = [
+      {id:'perfil', label:'Perfil'},
+      {id:'rutina', label:'Rutina'},
+      {id:'turnos', label:'Turnos'},
+      {id:'reservas', label:'Mis reservas'},
+    ];
+    return `
+      <div class="bottom-nav">
+        ${items.map(it => `
+          <button class="nav-btn ${view===it.id?'active':''}" data-view="${it.id}">
+            <span class="dot"></span>${it.label}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  function renderApp() {
+    const root = document.getElementById('root');
+
+    if (state.mode === 'adminPin') {
+      root.innerHTML = renderAdminPin(state.pinError);
+      document.getElementById('pinBtn').onclick = onPinSubmit;
+      document.getElementById('pinInput').addEventListener('keydown', e => { if (e.key === 'Enter') onPinSubmit(); });
+      document.getElementById('backToLoginBtn').onclick = () => { state.mode = 'login'; state.pinError = ''; renderApp(); };
+      return;
+    }
+
+    if (state.mode === 'admin') {
+      root.innerHTML = renderAdmin(state.data, state.adminFormError, state.adminFormNotice);
+
+      root.querySelectorAll('[data-admin-tab]').forEach(btn => {
+        btn.onclick = () => {
+          state.adminTab = btn.dataset.adminTab;
+          renderApp();
+        };
+      });
+
+      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; state.editingDni = null; renderApp(); };
+
+      if (state.adminTab === 'clientes') {
+        wireAdminForm();
+        root.querySelectorAll('[data-del-dni]').forEach(btn => {
+          btn.onclick = () => eliminarCliente(btn.dataset.delDni);
+        });
+        root.querySelectorAll('[data-estado-dni]').forEach(sel => {
+          sel.onchange = () => cambiarEstadoCliente(sel.dataset.estadoDni, sel.value);
+        });
+        root.querySelectorAll('[data-matricula-dni]').forEach(btn => {
+          btn.onclick = () => registrarMatricula(btn.dataset.matriculaDni);
+        });
+        root.querySelectorAll('[data-toggle-rutinas]').forEach(btn => {
+          btn.onclick = () => {
+            const dni = btn.dataset.toggleRutinas;
+            state.rutinasAbiertoDni = state.rutinasAbiertoDni === dni ? null : dni;
+            renderApp();
+          };
+        });
+        root.querySelectorAll('[data-add-rutina]').forEach(btn => {
+          btn.onclick = () => {
+            const dni = btn.dataset.addRutina;
+            agregarRutina(dni);
+          };
+        });
+        root.querySelectorAll('[data-del-rutina]').forEach(btn => {
+          btn.onclick = () => {
+            const [dni, rutinaId] = btn.dataset.delRutina.split('|');
+            eliminarRutina(dni, rutinaId);
+          };
+        });
+        root.querySelectorAll('[data-edit-dni]').forEach(btn => {
+          btn.onclick = () => {
+            state.editingDni = btn.dataset.editDni;
+            state.adminFormError = ''; state.adminFormNotice = '';
+            renderApp();
+          };
+        });
+        const cancelBtn = document.getElementById('cancelEditBtn');
+        if (cancelBtn) cancelBtn.onclick = () => { state.editingDni = null; renderApp(); };
+
+        const buscarInput = document.getElementById('clienteBuscar');
+        if (buscarInput) {
+          buscarInput.oninput = (e) => {
+            state.clienteBusqueda = e.target.value;
+            renderApp();
+            const el = document.getElementById('clienteBuscar');
+            if (el) {
+              el.focus();
+              const pos = el.value.length;
+              el.setSelectionRange(pos, pos);
+            }
+          };
+        }
+      }
+
+      if (state.adminTab === 'asistencias') {
+        document.getElementById('asistFechaInput').onchange = (e) => {
+          state.asistenciasFecha = e.target.value;
+          renderApp();
+        };
+        root.querySelectorAll('[data-fecha-atajo]').forEach(btn => {
+          btn.onclick = () => {
+            state.asistenciasFecha = btn.dataset.fechaAtajo;
+            renderApp();
+          };
+        });
+        root.querySelectorAll('.asist-btn').forEach(btn => {
+          btn.onclick = () => marcarAsistencia(btn.dataset.asistId, btn.dataset.asistVal);
+        });
+      }
+
+      if (state.adminTab === 'cuotas') {
+        root.querySelectorAll('[data-registrar-pago]').forEach(btn => {
+          btn.onclick = () => {
+            const dni = btn.dataset.registrarPago;
+            const durSel = document.querySelector(`[data-duracion-dni="${dni}"]`);
+            const metSel = document.querySelector(`[data-metodo-dni="${dni}"]`);
+            registrarNuevoPago(dni, durSel.value, metSel.value);
+          };
+        });
+        root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
+          btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
+        });
+      }
+
+      if (state.adminTab === 'resumen') {
+        const backupBtn = document.getElementById('backupBtn');
+        if (backupBtn) backupBtn.onclick = descargarBackup;
+        const seedBtn = document.getElementById('seedMananaBtn');
+        if (seedBtn) seedBtn.onclick = sembrarReservasManana;
+        root.querySelectorAll('[data-jump-tab]').forEach(btn => {
+          btn.onclick = () => { state.adminTab = btn.dataset.jumpTab; renderApp(); };
+        });
+      }
+      return;
+    }
+
+    if (!state.cliente) {
+      root.innerHTML = renderLogin(state.loginError);
+      document.getElementById('loginBtn').onclick = onLogin;
+      document.getElementById('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
+      document.getElementById('adminLinkBtn').onclick = () => { state.mode = 'adminPin'; renderApp(); };
+      return;
+    }
+
+    let body = '';
+    if (state.view === 'perfil') body = renderPerfil(state.cliente, state.data);
+    else if (state.view === 'rutina') body = renderRutina(state.cliente);
+    else if (state.view === 'turnos') body = renderTurnos(state.cliente, state.data, state.selectedDate);
+    else body = renderMisReservas(state.cliente, state.data);
+
+    root.innerHTML = `
+      <div class="app-header">
+        <div class="who">
+          <span class="name">${state.cliente.nombre}</span>
+          <span class="plan">${state.cliente.plan}</span>
+        </div>
+        <div class="header-right">
+          ${pillForEstado(state.cliente.estado)}
+          <button class="logout-btn" id="logoutBtn" title="Cerrar sesión">Salir</button>
+        </div>
+      </div>
+      ${body}
+      ${renderNav(state.view)}
+    `;
+
+    document.getElementById('logoutBtn').onclick = onLogout;
+
+    root.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.onclick = () => { state.view = btn.dataset.view; renderApp(); };
+    });
+
+    if (state.view === 'turnos') {
+      root.querySelectorAll('.date-chip:not(.past)').forEach(chip => {
+        chip.onclick = () => { state.selectedDate = chip.dataset.date; renderApp(); };
+      });
+      root.querySelectorAll('.slot-btn[data-hora]').forEach(btn => {
+        btn.onclick = () => reservarTurno(btn.dataset.hora);
+      });
+      root.querySelectorAll('.slot-btn[data-desmarcar-id]').forEach(btn => {
+        btn.onclick = () => cancelarReserva(btn.dataset.desmarcarId);
+      });
+    }
+    if (state.view === 'reservas') {
+      root.querySelectorAll('.cancel-link').forEach(btn => {
+        btn.onclick = () => cancelarReserva(btn.dataset.id);
+      });
+    }
+  }
+
+  function onLogout() {
+    state.cliente = null;
+    state.view = 'perfil';
+    state.loginError = '';
+    renderApp();
+  }
+
+  async function onLogin() {
+    const dni = document.getElementById('dniInput').value.trim();
+    const pass = document.getElementById('passInput').value;
+    const found = state.data.clientes.find(c => c.dni === dni);
+    if (!found) {
+      state.loginError = 'No encontramos ese DNI. Verificalo o hablá con recepción.';
+      renderApp();
+      return;
+    }
+    if (found.password !== pass) {
+      state.loginError = 'Contraseña incorrecta.';
+      renderApp();
+      return;
+    }
+    state.cliente = found;
+    state.loginError = '';
+    state.view = 'perfil';
+    state.selectedDate = isoDate(bookableWeekdays()[0]);
+    renderApp();
+  }
+
+  async function onPinSubmit() {
+    const val = document.getElementById('pinInput').value;
+    if (val !== ADMIN_PIN) {
+      state.pinError = 'Clave incorrecta.';
+      renderApp();
+      return;
+    }
+    state.pinError = '';
+    state.adminFormError = '';
+    state.adminFormNotice = '';
+    state.mode = 'admin';
+    state.adminTab = 'resumen';
+    renderApp();
+  }
+
+  function wireAdminForm() {
+    const planSel = document.getElementById('fPlan');
+    const diasSel = document.getElementById('fDias');
+    const preview = document.getElementById('fPrecioPreview');
+    const updatePreview = () => {
+      const esPro = planSel.value === 'PRO';
+      diasSel.disabled = esPro;
+      const dias = esPro ? null : parseInt(diasSel.value, 10);
+      const precio = precioDe(planSel.value, dias);
+      preview.textContent = precio ? money(precio) + ' / mes' : 'Combinación no válida';
+    };
+    planSel.onchange = updatePreview;
+    diasSel.onchange = updatePreview;
+    updatePreview();
+    document.getElementById('addClienteBtn').onclick = onAddCliente;
+  }
+
+  async function onAddCliente() {
+    const dniField = document.getElementById('fDni');
+    const dni = dniField.value.trim();
+    const password = document.getElementById('fPass').value.trim();
+    const nombre = document.getElementById('fNombre').value.trim();
+    const email = document.getElementById('fEmail').value.trim();
+    const telefono = document.getElementById('fTelefono').value.trim();
+    const plan = document.getElementById('fPlan').value;
+    const esPro = plan === 'PRO';
+    const dias = esPro ? null : parseInt(document.getElementById('fDias').value, 10);
+    const fuerza = parseInt(document.getElementById('fFuerza').value, 10) || 0;
+    const resistencia = parseInt(document.getElementById('fResistencia').value, 10) || 0;
+    const velocidad = parseInt(document.getElementById('fVelocidad').value, 10) || 0;
+    const estado = document.getElementById('fEstado').value;
+    const limiteRaw = document.getElementById('fLimiteSemanal').value.trim();
+    const limiteSemanalOverride = limiteRaw === '' ? null : parseInt(limiteRaw, 10);
+
+    if (!dni || !password || !nombre) {
+      state.adminFormError = 'Completá al menos DNI, contraseña y nombre.';
+      state.adminFormNotice = '';
+      renderApp();
+      return;
+    }
+
+    const precio = precioDe(plan, dias);
+    const datosComunes = {
+      password, nombre, email, telefono, plan, precio,
+      dias: esPro ? null : dias,
+      estimulos: esPro ? null : { fuerza, resistencia, velocidad },
+      estado,
+      limiteSemanalOverride,
+    };
+
+    if (state.editingDni) {
+      const cActual = state.data.clientes.find(x => x.dni === state.editingDni);
+      const estadoAnterior = cActual.estado;
+      const candidato = { ...cActual, ...datosComunes };
+      const nota = aplicarTransicionEstado(candidato, estadoAnterior, estado);
+      const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', state.editingDni);
+      if (error) { state.adminFormError = 'No se pudo guardar (' + error.message + ')'; renderApp(); return; }
+      await refreshData();
+      state.editingDni = null;
+      state.adminFormError = '';
+      state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}`;
+      renderApp();
+      return;
+    }
+
+    if (state.data.clientes.some(c => c.dni === dni)) {
+      state.adminFormError = 'Ya existe un cliente con ese DNI.';
+      state.adminFormNotice = '';
+      renderApp();
+      return;
+    }
+    const matriculaPagada = document.getElementById('fMatriculaPagada').checked;
+    const nuevoCliente = {
+      dni, ...datosComunes,
+      matricula: { pagada: matriculaPagada, fechaPago: matriculaPagada ? isoDate(new Date()) : null },
+      pausadoDesde: estado === 'Pausado' ? isoDate(new Date()) : null,
+    };
+    const { error: errCliente } = await sb.from('clientes').insert(clienteJsToDb(nuevoCliente));
+    if (errCliente) { state.adminFormError = 'No se pudo crear (' + errCliente.message + ')'; renderApp(); return; }
+
+    let notaPago = '';
+    const duracionPago = document.getElementById('fDuracionPago').value;
+    if (duracionPago) {
+      const dur = DURACIONES.find(d => d.id === duracionPago);
+      const metodoPago = document.getElementById('fMetodoPago').value;
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const venc = new Date(hoy);
+      venc.setDate(venc.getDate() + dur.dias);
+      const monto = Math.round((precio || 0) * dur.factor);
+      const nuevoPago = {
+        id: 'pago-' + dni + '-' + Date.now(),
+        dni, fechaPago: isoDate(hoy), duracionId: dur.id, dias: dur.dias, monto, metodoPago,
+        fechaVencimiento: isoDate(venc),
+      };
+      const { error: errPago } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+      if (!errPago) notaPago = ` Pago inicial registrado (${dur.label}, vence ${formatFechaCorta(isoDate(venc))}).`;
+    }
+
+    await refreshData();
+    state.adminFormError = '';
+    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}`;
+    renderApp();
+  }
+
+  function descargarBackup() {
+    const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'origo-backup-' + isoDate(new Date()) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Descargando copia de seguridad...');
+  }
+
+  async function sembrarReservasManana() {
+    const manana = new Date();
+    manana.setDate(manana.getDate() + 1);
+    manana.setHours(0, 0, 0, 0);
+    const fechaManana = isoDate(manana);
+    const activos = state.data.clientes.filter(c => c.estado === 'Activo');
+    const nuevasReservas = [];
+    activos.forEach((c, i) => {
+      const hora = HORARIOS[i % HORARIOS.length];
+      const yaExiste = state.data.reservas.some(r =>
+        r.dni === c.dni && r.fecha === fechaManana && r.hora === hora && r.estado !== 'cancelado');
+      if (!yaExiste) {
+        nuevasReservas.push({
+          id: 'seedtest-' + c.dni + '-' + Date.now() + '-' + i,
+          dni: c.dni, fecha: fechaManana, hora, estado: 'reservado',
+        });
+      }
+    });
+    if (nuevasReservas.length === 0) {
+      showToast('No hay clientes activos nuevos para anotar (¿ya los anotaste?).');
+      return;
+    }
+    const { error } = await sb.from('reservas').insert(nuevasReservas);
+    if (error) { showToast('No se pudo sembrar.'); console.error(error); return; }
+    await refreshData();
+    showToast(nuevasReservas.length + ' reserva(s) de prueba creadas para mañana (' + formatFechaCorta(fechaManana) + ')');
+    renderApp();
+  }
+
+  async function marcarAsistencia(reservaId, valor) {
+    const r = state.data.reservas.find(x => x.id === reservaId);
+    if (!r) return;
+    const nuevoEstado = (r.estado === valor) ? 'reservado' : valor; // tocar de nuevo lo deshace
+    const { error } = await sb.from('reservas').update({ estado: nuevoEstado }).eq('id', reservaId);
+    if (error) { showToast('No se pudo actualizar.'); console.error(error); return; }
+    await refreshData();
+    renderApp();
+  }
+
+  async function eliminarCliente(dni) {
+    const { error } = await sb.from('clientes').delete().eq('dni', dni);
+    if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Cliente eliminado');
+    renderApp();
+  }
+
+  function aplicarTransicionEstado(c, estadoAnterior, nuevoEstado) {
+    if (nuevoEstado === estadoAnterior) return '';
+    if (nuevoEstado === 'Baja') {
+      c.matricula = { pagada: false, fechaPago: null };
+      c.pausadoDesde = null;
+      return ' Se reinició su matrícula: va a tener que pagarla de nuevo si vuelve.';
+    }
+    if (nuevoEstado === 'Pausado') {
+      c.pausadoDesde = isoDate(new Date());
+      return ' Empieza a correr el plazo de pausa (máximo 3 meses).';
+    }
+    if (nuevoEstado === 'Activo') {
+      c.pausadoDesde = null;
+    }
+    return '';
+  }
+
+  async function cambiarEstadoCliente(dni, nuevoEstado) {
+    const cActual = state.data.clientes.find(x => x.dni === dni);
+    if (!cActual) return;
+    const estadoAnterior = cActual.estado;
+    const candidato = { ...cActual, estado: nuevoEstado };
+    const nota = aplicarTransicionEstado(candidato, estadoAnterior, nuevoEstado);
+    const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', dni);
+    if (error) { showToast('No se pudo actualizar.'); console.error(error); return; }
+    await refreshData();
+    showToast(cActual.nombre + ' ahora está ' + nuevoEstado.toLowerCase() + '.' + nota);
+    renderApp();
+  }
+
+  async function registrarMatricula(dni) {
+    const c = state.data.clientes.find(x => x.dni === dni);
+    if (!c) return;
+    const { error } = await sb.from('clientes')
+      .update({ matricula_pagada: true, matricula_fecha_pago: isoDate(new Date()) })
+      .eq('dni', dni);
+    if (error) { showToast('No se pudo registrar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Matrícula registrada para ' + c.nombre);
+    renderApp();
+  }
+
+  async function agregarRutina(dni) {
+    const tituloInput = document.getElementById('rutinaTitulo-' + dni);
+    const urlInput = document.getElementById('rutinaUrl-' + dni);
+    const titulo = tituloInput.value.trim();
+    let url = urlInput.value.trim();
+    if (!titulo || !url) {
+      showToast('Completá el título y el link.');
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const { error } = await sb.from('rutinas').insert({
+      id: 'rutina-' + Date.now(), dni, titulo, url, fecha: isoDate(new Date()),
+    });
+    if (error) { showToast('No se pudo agregar la rutina.'); console.error(error); return; }
+    await refreshData();
+    showToast('Rutina agregada');
+    renderApp();
+  }
+
+  async function eliminarRutina(dni, rutinaId) {
+    const { error } = await sb.from('rutinas').delete().eq('id', rutinaId);
+    if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Rutina eliminada');
+    renderApp();
+  }
+
+  function diasPausado(c) {
+    if (!c.pausadoDesde) return null;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const desde = new Date(c.pausadoDesde + 'T00:00:00');
+    return Math.round((hoy - desde) / 86400000);
+  }
+
+  async function reservarTurno(hora) {
+    const reservasHoy = state.data.reservas.filter(r =>
+      r.dni === state.cliente.dni && r.fecha === state.selectedDate && r.estado !== 'cancelado');
+    if (reservasHoy.length >= MAX_TURNOS_POR_DIA) {
+      showToast('Ya reservaste ' + MAX_TURNOS_POR_DIA + ' turnos ese día. Desmarcá uno primero.');
+      return;
+    }
+    const limiteSemanal = limiteSemanalDe(state.cliente);
+    const reservasSemana = reservasEnSemana(state.data, state.cliente.dni, state.selectedDate);
+    if (reservasSemana.length >= limiteSemanal) {
+      showToast('Ya alcanzaste tu límite semanal de turnos según tu plan.');
+      return;
+    }
+    const nueva = {
+      id: 'r' + Date.now() + Math.random().toString(36).slice(2,7),
+      dni: state.cliente.dni,
+      fecha: state.selectedDate,
+      hora,
+      estado: 'reservado',
+    };
+    const { error } = await sb.from('reservas').insert(nueva);
+    if (error) { showToast('No se pudo reservar. Probá de nuevo.'); console.error(error); return; }
+    await refreshData();
+    showToast('Turno reservado: ' + hora + ' hs');
+    renderApp();
+  }
+
+  async function cancelarReserva(id) {
+    const { error } = await sb.from('reservas').update({ estado: 'cancelado' }).eq('id', id);
+    if (error) { showToast('No se pudo cancelar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Reserva cancelada');
+    renderApp();
+  }
+
+  async function init() {
+    await refreshData();
+    renderApp();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
