@@ -1571,8 +1571,12 @@
     // que sabemos que es correcta, sin que el cliente note nada.
     if (!esPasswordHasheada(found.password)) {
       const nuevoHash = await hashPassword(pass);
-      sb.from('clientes').update({ password: nuevoHash }).eq('dni', dni).then(() => {});
-      found.password = nuevoHash;
+      const { error: errUpgrade } = await sb.from('clientes').update({ password: nuevoHash }).eq('dni', dni);
+      if (errUpgrade) {
+        console.error('No se pudo proteger la contraseña automáticamente:', errUpgrade.message);
+      } else {
+        found.password = nuevoHash;
+      }
     }
     state.cliente = found;
     state.loginError = '';
