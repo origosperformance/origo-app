@@ -385,7 +385,43 @@
       dias: 3, estimulos: { fuerza: 3, resistencia: 1, velocidad: 2 }, estado: 'Pausado' },
   ];
 
-  const ADMIN_PIN = 'ORIGO2026';
+  // Hash de la clave de administrador (PBKDF2). La clave real en texto plano
+  // no aparece en ningún lado del código — solo este código irreversible.
+  const ADMIN_PIN_HASH = 'pbkdf2$100000$824c33baf0cdca315d6eb9ed37fd4a2d$00a2d13c5b593d474b94fbda264304b22d007f9f84ce16160584fcba90b2faa3';
+
+  // ---------------- Hash de contraseñas (Web Crypto, sin librerías externas) ----------------
+  function bufToHex(buf) { return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join(''); }
+  function hexToBuf(hex) {
+    const arr = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.substr(i * 2, 2), 16);
+    return arr;
+  }
+
+  async function hashPassword(plain) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iterations = 100000;
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(plain), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, key, 256);
+    return 'pbkdf2$' + iterations + '$' + bufToHex(salt) + '$' + bufToHex(new Uint8Array(bits));
+  }
+
+  // Compara una contraseña ingresada contra lo guardado. Si lo guardado es un
+  // hash (empieza con "pbkdf2$"), compara de forma segura. Si es texto plano
+  // viejo (de antes de este cambio), compara directo por compatibilidad.
+  async function verifyPassword(plain, stored) {
+    if (!stored) return false;
+    if (!stored.startsWith('pbkdf2$')) return plain === stored;
+    const [, iterStr, saltHex, hashHex] = stored.split('$');
+    const iterations = parseInt(iterStr, 10);
+    const salt = hexToBuf(saltHex);
+    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(plain), 'PBKDF2', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, key, 256);
+    return bufToHex(new Uint8Array(bits)) === hashHex;
+  }
+
+  function esPasswordHasheada(stored) {
+    return !!stored && stored.startsWith('pbkdf2$');
+  }
   const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Débito automático'];
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const MATRICULA_PRECIO = 30000;
@@ -398,16 +434,17 @@
   ];
 
   // Copia de DEFAULT_CLIENTES con matrícula/pausa ya cargadas, para que la demo se vea realista
-  function seedClientesIniciales() {
+  async function seedClientesIniciales() {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const addDias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return isoDate(d); };
     const clientes = JSON.parse(JSON.stringify(DEFAULT_CLIENTES));
-    clientes.forEach(c => {
+    for (const c of clientes) {
+      c.password = await hashPassword(c.password);
       c.matricula = { pagada: true, fechaPago: addDias(-60) };
       c.pausadoDesde = null;
       c.rutinas = [];
-    });
+    }
     const zorro = clientes.find(c => c.dni === '27444333');
     if (zorro) zorro.pausadoDesde = addDias(-40); // lleva 40 días pausado, dentro del límite de 90
     return clientes;
@@ -562,7 +599,7 @@
   }
 
   async function sembrarDatosIniciales() {
-    const clientesSeed = seedClientesIniciales();
+    const clientesSeed = await seedClientesIniciales();
     const pagosSeed = seedPagosIniciales();
     await sb.from('clientes').insert(clientesSeed.map(clienteJsToDb));
     await sb.from('pagos').insert(pagosSeed.map(pagoJsToDb));
@@ -848,7 +885,7 @@
         <div class="profile-card" style="margin-bottom:24px;">
           <div class="admin-field-grid">
             <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 30111222" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
-            <label>Contraseña<input type="text" id="fPass" placeholder="Ej: 1234" value="${editing?editing.password:''}"></label>
+            <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Ej: 1234'}" value=""></label>
             <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?editing.nombre:''}"></label>
             <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email:''}"></label>
             <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?editing.telefono||'':''}"></label>
@@ -1524,10 +1561,18 @@
       renderApp();
       return;
     }
-    if (found.password !== pass) {
+    const ok = await verifyPassword(pass, found.password);
+    if (!ok) {
       state.loginError = 'Contraseña incorrecta.';
       renderApp();
       return;
+    }
+    // Si todavía tenía la contraseña vieja en texto plano, la protegemos ahora
+    // que sabemos que es correcta, sin que el cliente note nada.
+    if (!esPasswordHasheada(found.password)) {
+      const nuevoHash = await hashPassword(pass);
+      sb.from('clientes').update({ password: nuevoHash }).eq('dni', dni).then(() => {});
+      found.password = nuevoHash;
     }
     state.cliente = found;
     state.loginError = '';
@@ -1538,7 +1583,8 @@
 
   async function onPinSubmit() {
     const val = document.getElementById('pinInput').value;
-    if (val !== ADMIN_PIN) {
+    const ok = await verifyPassword(val, ADMIN_PIN_HASH);
+    if (!ok) {
       state.pinError = 'Clave incorrecta.';
       renderApp();
       return;
@@ -1585,8 +1631,10 @@
     const limiteRaw = document.getElementById('fLimiteSemanal').value.trim();
     const limiteSemanalOverride = limiteRaw === '' ? null : parseInt(limiteRaw, 10);
 
-    if (!dni || !password || !nombre) {
-      state.adminFormError = 'Completá al menos DNI, contraseña y nombre.';
+    if (!dni || !nombre || (!state.editingDni && !password)) {
+      state.adminFormError = state.editingDni
+        ? 'Completá al menos DNI y nombre.'
+        : 'Completá al menos DNI, contraseña y nombre.';
       state.adminFormNotice = '';
       renderApp();
       return;
@@ -1594,7 +1642,7 @@
 
     const precio = precioDe(plan, dias);
     const datosComunes = {
-      password, nombre, email, telefono, plan, precio,
+      nombre, email, telefono, plan, precio,
       dias: esPro ? null : dias,
       estimulos: esPro ? null : { fuerza, resistencia, velocidad },
       estado,
@@ -1604,7 +1652,8 @@
     if (state.editingDni) {
       const cActual = state.data.clientes.find(x => x.dni === state.editingDni);
       const estadoAnterior = cActual.estado;
-      const candidato = { ...cActual, ...datosComunes };
+      const nuevoPassword = password ? await hashPassword(password) : cActual.password;
+      const candidato = { ...cActual, ...datosComunes, password: nuevoPassword };
       const nota = aplicarTransicionEstado(candidato, estadoAnterior, estado);
       const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', state.editingDni);
       if (error) { state.adminFormError = 'No se pudo guardar (' + error.message + ')'; renderApp(); return; }
@@ -1623,8 +1672,9 @@
       return;
     }
     const matriculaPagada = document.getElementById('fMatriculaPagada').checked;
+    const passwordHash = await hashPassword(password);
     const nuevoCliente = {
-      dni, ...datosComunes,
+      dni, ...datosComunes, password: passwordHash,
       matricula: { pagada: matriculaPagada, fechaPago: matriculaPagada ? isoDate(new Date()) : null },
       pausadoDesde: estado === 'Pausado' ? isoDate(new Date()) : null,
     };
