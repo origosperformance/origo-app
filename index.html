@@ -172,6 +172,13 @@
   .cuota-nombre { font-size: 14px; font-weight: 600; }
   .pago-detalle { font-size: 12px; color: var(--text-muted); }
   .pago-registrar { display: flex; gap: 8px; margin-top: 10px; }
+  .plan-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .plan-row:last-child { border-bottom: none; }
+  .plan-row-dias { flex: 1; font-size: 13px; color: var(--text-muted); }
+  .plan-precio-input {
+    width: 110px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 8px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit; text-align: right;
+  }
   .metodo-select, .duracion-select {
     flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
     padding: 8px 8px; border-radius: var(--radius); font-size: 12px; font-family: inherit;
@@ -432,7 +439,6 @@
   }
   const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Débito automático'];
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const MATRICULA_PRECIO = 30000;
   const MAX_DIAS_PAUSA = 90; // ~3 meses
   const DURACIONES = [
     { id: '15d', label: '15 días', dias: 15, factor: 0.5 },
@@ -470,16 +476,39 @@
     ];
   }
 
-  const PRECIOS = {
-    'START':          { 1: 55000, 2: 70000, 3: 80000,  4: 90000,  5: 100000 },
-    'PERFORMANCE 2':  {           2: 85000, 3: 95000,  4: 105000, 5: 115000 },
-    'PERFORMANCE 3':  {           2: 95000, 3: 105000, 4: 115000, 5: 120000 },
-    'PRO':            { null: 125000 },
-  };
+  function seedPlanesIniciales() {
+    const tabla = {
+      'START':          { 1: 55000, 2: 70000, 3: 80000,  4: 90000,  5: 100000 },
+      'PERFORMANCE 2':  {           2: 85000, 3: 95000,  4: 105000, 5: 115000 },
+      'PERFORMANCE 3':  {           2: 95000, 3: 105000, 4: 115000, 5: 120000 },
+      'PRO':            { null: 125000 },
+    };
+    const filas = [];
+    Object.entries(tabla).forEach(([plan, porDias]) => {
+      Object.entries(porDias).forEach(([diasStr, precio]) => {
+        const dias = diasStr === 'null' ? null : parseInt(diasStr, 10);
+        filas.push({ id: plan + '-' + (dias ?? 'null'), plan, dias, precio });
+      });
+    });
+    return filas;
+  }
+
+  function seedConfigInicial() {
+    return [{ clave: 'matricula_precio', valor: 30000 }];
+  }
 
   function precioDe(plan, dias) {
-    const tabla = PRECIOS[plan] || {};
-    return tabla[dias] ?? tabla[null] ?? null;
+    if (!state.data || !state.data.planes) return null;
+    const exacto = state.data.planes.find(p => p.plan === plan && p.dias === dias);
+    if (exacto) return exacto.precio;
+    const integral = state.data.planes.find(p => p.plan === plan && p.dias === null);
+    return integral ? integral.precio : null;
+  }
+
+  function matriculaPrecio() {
+    if (!state.data || !state.data.config) return 30000;
+    const fila = state.data.config.find(c => c.clave === 'matricula_precio');
+    return fila ? fila.valor : 30000;
   }
 
   let state = {
@@ -613,25 +642,39 @@
     await sb.from('pagos').insert(pagosSeed.map(pagoJsToDb));
   }
 
+  async function sembrarPlanesIniciales() {
+    const planesSeed = seedPlanesIniciales();
+    const configSeed = seedConfigInicial();
+    await sb.from('planes').insert(planesSeed);
+    await sb.from('config').insert(configSeed);
+  }
+
   async function refreshData() {
-    const [clientesRes, reservasRes, pagosRes, rutinasRes] = await Promise.all([
+    const [clientesRes, reservasRes, pagosRes, rutinasRes, planesRes, configRes] = await Promise.all([
       sb.from('clientes').select('*'),
       sb.from('reservas').select('*'),
       sb.from('pagos').select('*'),
       sb.from('rutinas').select('*'),
+      sb.from('planes').select('*'),
+      sb.from('config').select('*'),
     ]);
 
-    if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error) {
-      const primerError = clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error;
+    if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error) {
+      const primerError = clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error;
       console.error('Error leyendo Supabase:', primerError.message || primerError);
       showToast('Error de base de datos: ' + (primerError.message || 'desconocido'));
-      state.data = state.data || { clientes: [], reservas: [], pagos: [] };
+      state.data = state.data || { clientes: [], reservas: [], pagos: [], planes: [], config: [] };
       return;
     }
 
     // Primera vez que se usa la base: no hay clientes, sembramos los de ejemplo
     if (clientesRes.data.length === 0) {
       await sembrarDatosIniciales();
+      return refreshData();
+    }
+    // Primera vez que se usa la tabla de planes (por ejemplo, si se agregó después)
+    if (planesRes.data.length === 0) {
+      await sembrarPlanesIniciales();
       return refreshData();
     }
 
@@ -644,6 +687,8 @@
       clientes: clientesRes.data.map(row => clienteDbToJs(row, rutinasPorDni)),
       reservas: reservasRes.data.map(r => ({ id: r.id, dni: r.dni, fecha: r.fecha, hora: r.hora, estado: r.estado })),
       pagos: pagosRes.data.map(pagoDbToJs),
+      planes: planesRes.data.map(p => ({ id: p.id, plan: p.plan, dias: p.dias, precio: p.precio })),
+      config: configRes.data.map(c => ({ clave: c.clave, valor: c.valor })),
     };
   }
 
@@ -713,6 +758,7 @@
     const tabs = [
       { id: 'resumen', label: 'Resumen' },
       { id: 'clientes', label: 'Clientes' },
+      { id: 'planes', label: 'Planes' },
       { id: 'cuotas', label: 'Cuotas' },
       { id: 'asistencias', label: 'Asistencias' },
     ];
@@ -727,6 +773,7 @@
     if (state.adminTab === 'cuotas') body = renderAdminCuotas(data);
     else if (state.adminTab === 'asistencias') body = renderAdminAsistencias(data);
     else if (state.adminTab === 'resumen') body = renderAdminResumen(data);
+    else if (state.adminTab === 'planes') body = renderAdminPlanes(data);
     else body = renderAdminClientes(data, formError, formNotice);
 
     return `
@@ -736,6 +783,47 @@
         ${body}
         <button class="link-btn" id="backToLoginBtn2" style="margin-top:24px;">← Salir de administración</button>
       </div>
+    `;
+  }
+
+  // ---------------- Admin: Planes ----------------
+  function renderAdminPlanes(data) {
+    const grupos = {};
+    (data.planes || []).slice().sort((a, b) => (a.dias ?? 99) - (b.dias ?? 99)).forEach(p => {
+      (grupos[p.plan] = grupos[p.plan] || []).push(p);
+    });
+
+    const ordenPlanes = ['START', 'PERFORMANCE 2', 'PERFORMANCE 3', 'PRO'];
+    const planesHtml = ordenPlanes.filter(p => grupos[p]).map(plan => {
+      const filas = grupos[plan].map(p => `
+        <div class="plan-row">
+          <span class="plan-row-dias">${p.dias ? p.dias + ' días/sem' : 'Integral'}</span>
+          <input type="text" inputmode="numeric" class="plan-precio-input" data-plan-id="${p.id}" value="${p.precio}">
+          <button class="cancel-link" data-guardar-plan="${p.id}">Guardar</button>
+        </div>`).join('');
+      return `
+        <div class="cuota-card">
+          <div class="cuota-nombre" style="margin-bottom:8px;">${plan}</div>
+          ${filas}
+        </div>`;
+    }).join('');
+
+    const matricula = matriculaPrecio();
+
+    return `
+        <p class="sub">Precios de los planes — se aplican al instante a los clientes nuevos y a los que registren un pago</p>
+        ${planesHtml}
+        <div class="cuota-card">
+          <div class="cuota-nombre" style="margin-bottom:8px;">Matrícula</div>
+          <div class="plan-row">
+            <span class="plan-row-dias">Alta de membresía</span>
+            <input type="text" inputmode="numeric" class="plan-precio-input" id="matriculaPrecioInput" value="${matricula}">
+            <button class="cancel-link" id="guardarMatriculaBtn">Guardar</button>
+          </div>
+        </div>
+        <div class="banner" style="border-color:var(--line); background:var(--surface-2); margin-top:16px;">
+          <b style="color:var(--text-muted);">Ojo</b>Cambiar un precio acá no le modifica la cuota a nadie que ya esté pagando — solo se usa para calcularle el monto a un cliente nuevo o la próxima vez que alguien registre un pago.
+        </div>
     `;
   }
 
@@ -833,7 +921,7 @@
       const matriculaHtml = (c.matricula && c.matricula.pagada)
         ? `<div class="admin-row-asist">Matrícula pagada el ${formatFechaCorta(c.matricula.fechaPago)}</div>`
         : `<div class="admin-row-asist" style="color:var(--red);">Matrícula sin pagar ·
-             <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(MATRICULA_PRECIO)})</button>
+             <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(matriculaPrecio())})</button>
            </div>`;
 
       let pausaHtml = '';
@@ -945,7 +1033,7 @@
             </label>
             <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
               <input type="checkbox" id="fMatriculaPagada" style="width:auto;">
-              Matrícula pagada (${money(MATRICULA_PRECIO)})
+              Matrícula pagada (${money(matriculaPrecio())})
             </label>
           </div>
           ` : ''}
@@ -1021,6 +1109,32 @@
     if (error) { showToast('No se pudo eliminar el pago.'); console.error(error); return; }
     await refreshData();
     showToast('Pago eliminado');
+    renderApp();
+  }
+
+  async function guardarPrecioPlan(id, valorTexto) {
+    const precio = parseInt(String(valorTexto).replace(/[^\d]/g, ''), 10);
+    if (!precio || precio <= 0) {
+      showToast('Ingresá un precio válido.');
+      return;
+    }
+    const { error } = await sb.from('planes').update({ precio }).eq('id', id);
+    if (error) { showToast('No se pudo guardar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Precio actualizado');
+    renderApp();
+  }
+
+  async function guardarPrecioMatricula(valorTexto) {
+    const valor = parseInt(String(valorTexto).replace(/[^\d]/g, ''), 10);
+    if (!valor || valor <= 0) {
+      showToast('Ingresá un precio válido.');
+      return;
+    }
+    const { error } = await sb.from('config').update({ valor }).eq('clave', 'matricula_precio');
+    if (error) { showToast('No se pudo guardar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Precio de matrícula actualizado');
     renderApp();
   }
 
@@ -1497,6 +1611,23 @@
         root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
           btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
         });
+      }
+
+      if (state.adminTab === 'planes') {
+        root.querySelectorAll('[data-guardar-plan]').forEach(btn => {
+          btn.onclick = () => {
+            const id = btn.dataset.guardarPlan;
+            const input = document.querySelector(`[data-plan-id="${id}"]`);
+            guardarPrecioPlan(id, input.value);
+          };
+        });
+        const matriculaBtn = document.getElementById('guardarMatriculaBtn');
+        if (matriculaBtn) {
+          matriculaBtn.onclick = () => {
+            const input = document.getElementById('matriculaPrecioInput');
+            guardarPrecioMatricula(input.value);
+          };
+        }
       }
 
       if (state.adminTab === 'resumen') {
