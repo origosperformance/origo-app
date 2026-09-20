@@ -344,6 +344,16 @@
     padding: 10px 10px; border-radius: var(--radius); font-size: 14px; font-family: inherit;
   }
 
+  /* ---------- WhatsApp ---------- */
+  .btn-whatsapp {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: #25D366; color: #06301A; text-decoration: none;
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14px;
+    padding: 13px 16px; border-radius: var(--radius); margin-bottom: 16px;
+  }
+  .btn-whatsapp:hover { background: #2FE070; }
+  .btn-whatsapp-icon { display: flex; }
+
   /* ---------- Nav ---------- */
   .bottom-nav {
     position: sticky; bottom: 0; display: flex; border-top: 1px solid var(--line);
@@ -427,6 +437,7 @@
   const METODOS_PAGO = ['Efectivo', 'Transferencia', 'Tarjeta', 'Débito automático'];
   const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const MAX_DIAS_PAUSA = 90; // ~3 meses
+  const WHATSAPP_NUMERO = '5493412606090';
   const DURACIONES = [
     { id: '15d', label: '15 días', dias: 15, factor: 0.5 },
     { id: '1m',  label: '1 mes',   dias: 30, factor: 1 },
@@ -1273,6 +1284,13 @@
           <div class="divider"></div>
           ${cuotaHtml}
         </div>
+
+        <a class="btn-whatsapp" href="https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent('Hola! Soy ' + cliente.nombre + ', socio de ORIGO.')}" target="_blank" rel="noopener">
+          <span class="btn-whatsapp-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.07c-.24.68-1.4 1.32-1.93 1.4-.5.08-1.11.11-1.79-.11-.41-.13-.94-.3-1.62-.6-2.85-1.23-4.7-4.1-4.85-4.29-.14-.19-1.15-1.53-1.15-2.92 0-1.39.73-2.07.99-2.35.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.73 1.2 1.56 1.95 1.08.96 1.98 1.26 2.26 1.4.28.14.44.12.61-.07.16-.19.7-.81.89-1.09.19-.28.37-.23.63-.14.26.09 1.66.78 1.94.93.28.14.47.21.54.33.07.12.07.68-.17 1.35z"/></svg>
+          </span>
+          Escribinos por WhatsApp
+        </a>
 
         <details class="cuota-aldiacolapso">
           <summary>Cambiar mi contraseña</summary>
