@@ -65,8 +65,6 @@
   .btn-primary:disabled { background: var(--green-dim); color: #5C6E93; cursor: not-allowed; }
   .btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
   .error-text { color: var(--red); font-size: 13px; min-height: 16px; }
-  .demo-hint { color: var(--text-muted); font-size: 12px; line-height: 1.6; border-top: 1px solid var(--line); padding-top: 16px; }
-  .demo-hint b { color: var(--text); }
   .link-btn {
     background: none; border: none; color: var(--text-muted); font-size: 13px;
     text-decoration: underline; cursor: pointer; padding: 0; text-align: left; font-family: 'Inter', sans-serif;
@@ -389,17 +387,6 @@
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const DIAS_CORTO = ['dom','lun','mar','mié','jue','vie','sáb'];
 
-  const DEFAULT_CLIENTES = [
-    { dni: '30111222', password: '1234', nombre: 'Juan Pérez', email: 'juan.perez@mail.com', telefono: '341-1234567', plan: 'START', precio: 90000,
-      dias: 4, estimulos: { fuerza: 4, resistencia: 0, velocidad: 0 }, estado: 'Activo' },
-    { dni: '28555666', password: '1234', nombre: 'Jose de San Martín', email: 'jose.sanmartin@mail.com', telefono: '341-2345678', plan: 'PRO', precio: 125000,
-      dias: null, estimulos: null, estado: 'Activo' },
-    { dni: '25999888', password: '1234', nombre: 'Angel Di María', email: 'angel.dimaria@mail.com', telefono: '341-3456789', plan: 'PERFORMANCE 2', precio: 95000,
-      dias: 3, estimulos: { fuerza: 2, resistencia: 2, velocidad: 0 }, estado: 'Activo' },
-    { dni: '27444333', password: '1234', nombre: 'Zorro Coccaro', email: 'zorro.coccaro@mail.com', telefono: '341-4567890', plan: 'PERFORMANCE 3', precio: 105000,
-      dias: 3, estimulos: { fuerza: 3, resistencia: 1, velocidad: 2 }, estado: 'Pausado' },
-  ];
-
   // Hash de la clave de administrador (PBKDF2). La clave real en texto plano
   // no aparece en ningún lado del código — solo este código irreversible.
   const ADMIN_PIN_HASH = 'pbkdf2$100000$824c33baf0cdca315d6eb9ed37fd4a2d$00a2d13c5b593d474b94fbda264304b22d007f9f84ce16160584fcba90b2faa3';
@@ -446,35 +433,6 @@
     { id: '3m',  label: '3 meses', dias: 90, factor: 3 },
     { id: '6m',  label: '6 meses', dias: 180, factor: 6 },
   ];
-
-  // Copia de DEFAULT_CLIENTES con matrícula/pausa ya cargadas, para que la demo se vea realista
-  async function seedClientesIniciales() {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const addDias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return isoDate(d); };
-    const clientes = JSON.parse(JSON.stringify(DEFAULT_CLIENTES));
-    for (const c of clientes) {
-      c.password = await hashPassword(c.password);
-      c.matricula = { pagada: true, fechaPago: addDias(-60) };
-      c.pausadoDesde = null;
-      c.rutinas = [];
-    }
-    const zorro = clientes.find(c => c.dni === '27444333');
-    if (zorro) zorro.pausadoDesde = addDias(-40); // lleva 40 días pausado, dentro del límite de 90
-    return clientes;
-  }
-
-  function seedPagosIniciales() {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const addDias = (n) => { const d = new Date(hoy); d.setDate(d.getDate() + n); return isoDate(d); };
-    return [
-      { id: 'seed-1', dni: '30111222', fechaPago: addDias(-5), duracionId: '1m', dias: 30, monto: 90000, metodoPago: 'Efectivo', fechaVencimiento: addDias(25) },
-      { id: 'seed-2', dni: '28555666', fechaPago: addDias(-2), duracionId: '1m', dias: 30, monto: 125000, metodoPago: 'Transferencia', fechaVencimiento: addDias(28) },
-      { id: 'seed-3', dni: '27444333', fechaPago: addDias(-40), duracionId: '1m', dias: 30, monto: 105000, metodoPago: 'Efectivo', fechaVencimiento: addDias(-10) },
-      // Angel Di María queda a propósito "Sin pagos" para mostrar ese estado
-    ];
-  }
 
   function seedPlanesIniciales() {
     const tabla = {
@@ -635,13 +593,6 @@
     };
   }
 
-  async function sembrarDatosIniciales() {
-    const clientesSeed = await seedClientesIniciales();
-    const pagosSeed = seedPagosIniciales();
-    await sb.from('clientes').insert(clientesSeed.map(clienteJsToDb));
-    await sb.from('pagos').insert(pagosSeed.map(pagoJsToDb));
-  }
-
   async function sembrarPlanesIniciales() {
     const planesSeed = seedPlanesIniciales();
     const configSeed = seedConfigInicial();
@@ -667,12 +618,8 @@
       return;
     }
 
-    // Primera vez que se usa la base: no hay clientes, sembramos los de ejemplo
-    if (clientesRes.data.length === 0) {
-      await sembrarDatosIniciales();
-      return refreshData();
-    }
-    // Primera vez que se usa la tabla de planes (por ejemplo, si se agregó después)
+    // Primera vez que se usa la tabla de planes: sembramos el catálogo de precios
+    // (esto sí hace falta siempre — son datos reales, no de prueba)
     if (planesRes.data.length === 0) {
       await sembrarPlanesIniciales();
       return refreshData();
@@ -720,16 +667,11 @@
         </div>
         <div class="login-form">
           <label for="dniInput">Tu DNI</label>
-          <input type="text" id="dniInput" inputmode="numeric" placeholder="Ej: 30111222" autocomplete="off" />
+          <input type="text" id="dniInput" inputmode="numeric" placeholder="Ej: 12345678" autocomplete="off" />
           <label for="passInput">Contraseña</label>
           <input type="password" id="passInput" placeholder="••••" autocomplete="off" />
           <div class="error-text">${errorMsg || ''}</div>
           <button class="btn btn-primary" id="loginBtn">Entrar</button>
-        </div>
-        <div class="demo-hint">
-          <b>Prototipo de prueba.</b> Usuarios de ejemplo (contraseña <b>1234</b> para todos):
-          30111222 (Juan, activo), 25999888 (Ángel, activo), 27444333 (Zorro, pausado — para ver
-          cómo se bloquea la reserva).
         </div>
         <button class="link-btn" id="adminLinkBtn">Acceso administrador</button>
       </div>
@@ -888,7 +830,6 @@
 
         <h2 style="font-size:16px; margin-top:24px;">Datos</h2>
         <button class="btn btn-ghost" id="backupBtn" style="width:100%;">Descargar copia de seguridad (.json)</button>
-        <button class="btn btn-ghost" id="seedMananaBtn" style="width:100%; margin-top:8px;">Anotar clientes activos a turnos de mañana (prueba)</button>
     `;
   }
 
@@ -980,8 +921,8 @@
 
         <div class="profile-card" style="margin-bottom:24px;">
           <div class="admin-field-grid">
-            <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 30111222" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
-            <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Ej: 1234'}" value=""></label>
+            <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
+            <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
             <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?editing.nombre:''}"></label>
             <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email:''}"></label>
             <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?editing.telefono||'':''}"></label>
@@ -1633,8 +1574,6 @@
       if (state.adminTab === 'resumen') {
         const backupBtn = document.getElementById('backupBtn');
         if (backupBtn) backupBtn.onclick = descargarBackup;
-        const seedBtn = document.getElementById('seedMananaBtn');
-        if (seedBtn) seedBtn.onclick = sembrarReservasManana;
         root.querySelectorAll('[data-jump-tab]').forEach(btn => {
           btn.onclick = () => { state.adminTab = btn.dataset.jumpTab; renderApp(); };
         });
@@ -1910,35 +1849,6 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast('Descargando copia de seguridad...');
-  }
-
-  async function sembrarReservasManana() {
-    const manana = new Date();
-    manana.setDate(manana.getDate() + 1);
-    manana.setHours(0, 0, 0, 0);
-    const fechaManana = isoDate(manana);
-    const activos = state.data.clientes.filter(c => c.estado === 'Activo');
-    const nuevasReservas = [];
-    activos.forEach((c, i) => {
-      const hora = HORARIOS[i % HORARIOS.length];
-      const yaExiste = state.data.reservas.some(r =>
-        r.dni === c.dni && r.fecha === fechaManana && r.hora === hora && r.estado !== 'cancelado');
-      if (!yaExiste) {
-        nuevasReservas.push({
-          id: 'seedtest-' + c.dni + '-' + Date.now() + '-' + i,
-          dni: c.dni, fecha: fechaManana, hora, estado: 'reservado',
-        });
-      }
-    });
-    if (nuevasReservas.length === 0) {
-      showToast('No hay clientes activos nuevos para anotar (¿ya los anotaste?).');
-      return;
-    }
-    const { error } = await sb.from('reservas').insert(nuevasReservas);
-    if (error) { showToast('No se pudo sembrar.'); console.error(error); return; }
-    await refreshData();
-    showToast(nuevasReservas.length + ' reserva(s) de prueba creadas para mañana (' + formatFechaCorta(fechaManana) + ')');
-    renderApp();
   }
 
   async function marcarAsistencia(reservaId, valor) {
