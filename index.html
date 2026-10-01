@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>ORIGO — Reservá tu turno</title>
 <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAD40lEQVR42tVWS0hjVxj+zrk3D0ZncMSpOIkTa1Ebn1l1ExMcJIs4vnDTjeuWwqCFILgoddlSKUjBRbezrBQbOhY7UOIDmxaVFnRqDVrqIqnDoJkaxJvce8/fxal3nPEmpo9F+6/OPY//db7vOxf4vxsrbxf/cycJzpk0IhJCENE/TICXXlcUhbFSWSrFXctjBMZw04/bQdY4AE378L233n7nfmtrq9PpTKfTuq4D4Jz/xVJk4ozDF0X4E/THMfCQv5mEd2jlmwU6t93d3fHxcYfDIUux9cTtvZPA9TsIfoTAu7jhAxhAEDqEWSjo1sbm5uaZmZm1tbXOzk7TNG1jMHvv1W144304KmDmobqRTeHJ9+z3X5BN+V+rbW3rCIVCIyMjXq/XMAxVVU9OToaHhxOJhKIopmle1ZnrdxD9DPfm0R9H5AG8d22vuqqqampqyjAMwzCIKJfLdXR0yPsoDlnGwB0Iz2DgS/TH0TOLa6+cLykSrJxzRVFUVZVnIpFILpcrFApEtL297Xa7OedFcMUUAHh1EMOP0Pc5Ig/grnk+b4My5nQ6AUSjUSFEPp8noomJCQBW+MugdeLup7j3BQa/wu3uEt4tkzFmZ2eJyDTNTCZTWVkpmWjX/VsBDDxEfxyhjwF2JctkxznnHo/n9PRUEntoaOgiavlFOPFbXVx1ccc1/JYEqBwhEUIASKfTy8vLUj96e3tlA18KQAAEuyGePRXZQxzvWJPlFMEYSyaT0q/f77cCA1DP8ycCfPryTe1nEmL37FcNQNnsJ6LDw0M5rq6uljMvVCBb9sHUxA/ffv3jd4/8rzcB4JyVLy4W/F8SpReu8cnTIwIDuMfjZYwxzsuVLsZ8Pp8cHx8f294BAPz0+LGcDofDRFRm/hI84XBYpr+zs2PDZ/nd0tIieX9wcOB2u6/Ueus9aG9v13Vdnh0cHLQXVxljZWVFZjQ5OWnxqERnpFbH43FJtHQ6XVFRYUe085h9fX1EpOu6pmnd3d0AHA6HbR2ccykJY2NjRKRpGhHFYrFSUiFjzM/PyxjZbDYSiVhL6gWzWiy9SyHa2tpyuVzFxe6c9zU1Nfv7+0RkGIZpmtPT0/X19Zc3BwKBubk5IpJSWkyu2eUYQoimpqbFxcXGxkbrPUkkEuvr65lMRlXVhoaGYDAYCoU45/l83uVylf3gXGhUXV3dwsLz5/eymaYpBxsbG11dXSWe5VK0HB0d3dzcLBZjb28vFotJpBXzzkpAUBKHMRYMBnt6etra2mpraxljR0dHqVRqdXV1aWnp7OzMauzf+e+6suorycjK0RmJPNkWOfPv/Tr+9+0PndQFDFA1ihwAAAAASUVORK5CYII=">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
@@ -39,7 +39,12 @@
   .stat, .num, h1, h2 {
     font-family: 'Oswald', 'Arial Narrow', sans-serif;
   }
-  #root { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+  #root {
+    max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh;
+    display: flex; flex-direction: column; position: relative;
+    /* iPhone: deja libre la zona del reloj/notch cuando la app está instalada */
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 
   /* ---------- Login ---------- */
   .login-screen {
@@ -241,6 +246,17 @@
   .view h2 { font-size: 22px; margin: 0 0 4px; font-weight: 600; }
   .view .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 20px; }
 
+  /* ---------- Título de pantalla con ícono ---------- */
+  .view-title { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .view-title .view-ico {
+    flex: 0 0 auto; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: var(--green);
+  }
+  .view-title .view-ico svg { width: 24px; height: 24px; }
+  .view-title h2 { margin: 0 0 2px; }
+  .view-title .sub { margin: 0; }
+  .ico { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
   /* ---------- Perfil ---------- */
   .banner {
     border-left: 3px solid var(--red); background: rgba(225,88,79,0.1);
@@ -310,6 +326,69 @@
   .res-card .right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
   .cancel-link { font-size: 12px; color: var(--text-muted); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; }
   .empty-state { text-align: center; color: var(--text-muted); font-size: 14px; padding: 60px 20px; line-height: 1.6; }
+  .slots-nota { font-size: 12px; color: var(--text-muted); margin: -6px 0 6px; }
+
+  /* Selector Próximos / Asistencias */
+  .seg { display: flex; border: 1px solid var(--line); border-radius: var(--radius); padding: 3px; gap: 3px; margin-bottom: 18px; background: var(--surface); }
+  .seg-btn {
+    flex: 1; background: none; border: none; color: var(--text-muted); font-family: 'Inter', sans-serif;
+    font-size: 13px; font-weight: 600; padding: 10px 6px; border-radius: 2px; cursor: pointer;
+  }
+  .seg-btn.active { background: var(--green); color: #F3F6F1; }
+  .seg-btn .seg-count { font-weight: 500; opacity: 0.75; margin-left: 4px; }
+
+  /* Asistencias del cliente */
+  .asis-stats { display: flex; gap: 8px; margin-bottom: 12px; }
+  .asis-stat {
+    flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 10px 11px; text-align: center;
+  }
+  .asis-stat .num { display: block; font-size: 30px; font-weight: 600; line-height: 1.1; }
+  .asis-stat .lbl { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.3; }
+  .asis-semana {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 13px 16px 14px; margin-bottom: 12px;
+  }
+  .asis-semana-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+  .asis-semana-top span:first-child { color: var(--text-muted); }
+  .asis-semana-top span:last-child { font-weight: 600; }
+  .asis-bar { height: 5px; background: var(--surface-2); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .asis-bar i { display: block; height: 100%; background: var(--green); border-radius: 3px; }
+
+  .cal-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 12px 14px; margin-bottom: 12px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-mes { font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 600; }
+  .cal-nav {
+    width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text); cursor: pointer;
+  }
+  .cal-nav svg { width: 18px; height: 18px; }
+  .cal-nav:disabled { opacity: 0.3; cursor: default; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow { text-align: center; font-size: 11px; color: var(--text-muted); padding-bottom: 4px; }
+  .cal-day {
+    aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--text-muted); border-radius: 50%; border: 1px solid transparent;
+  }
+  .cal-day.finde { opacity: 0.45; }
+  .cal-day.hoy { color: var(--text); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+  .cal-day.asistio { background: var(--green); color: #F3F6F1; font-weight: 600; opacity: 1; }
+  .cal-day.falto { border-color: var(--red); color: var(--red); opacity: 1; }
+  .cal-day.reservado { border-color: var(--green); color: var(--green); opacity: 1; }
+  .cal-leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 12px; font-size: 11px; color: var(--text-muted); }
+  .cal-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .cal-leyenda i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid transparent; }
+  .cal-leyenda i.asistio { background: var(--green); }
+  .cal-leyenda i.falto { border-color: var(--red); }
+  .cal-leyenda i.reservado { border-color: var(--green); }
+
+  .asis-lista-titulo { font-size: 13px; color: var(--text-muted); margin: 18px 0 8px; }
+  .asis-fila {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .asis-fila .dia { font-weight: 500; }
+  .asis-fila .hora { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 
   /* ---------- Rutina ---------- */
   .rutina-card {
@@ -359,20 +438,28 @@
 
   /* ---------- Nav ---------- */
   .bottom-nav {
-    position: sticky; bottom: 0; display: flex; border-top: 1px solid var(--line);
+    position: sticky; bottom: 0; z-index: 5; display: flex; border-top: 1px solid var(--line);
     background: var(--bg);
+    /* iPhone: el espacio de abajo queda reservado para la barra de inicio,
+       así los botones no se pisan con el gesto de minimizar la app. */
+    padding: 0 4px calc(4px + env(safe-area-inset-bottom, 0px));
   }
   .nav-btn {
-    flex: 1; background: none; border: none; color: var(--text-muted); padding: 12px 0 10px;
+    flex: 1; position: relative; background: none; border: none; color: var(--text-muted);
+    min-height: 60px; padding: 10px 0 8px;
     font-size: 11px; font-family: 'Inter', sans-serif; cursor: pointer; display: flex;
-    flex-direction: column; align-items: center; gap: 4px; letter-spacing: 0.2px;
+    flex-direction: column; align-items: center; justify-content: center; gap: 5px; letter-spacing: 0.2px;
+    -webkit-tap-highlight-color: transparent;
   }
-  .nav-btn .dot { width: 5px; height: 5px; border-radius: 50%; background: transparent; }
+  .nav-btn svg { width: 23px; height: 23px; }
   .nav-btn.active { color: var(--text); }
-  .nav-btn.active .dot { background: var(--green); }
+  .nav-btn.active svg { color: var(--green); }
+  .nav-btn.active::before {
+    content: ''; position: absolute; top: -1px; left: 26%; right: 26%; height: 2px; background: var(--green);
+  }
 
   .toast {
-    position: fixed; left: 50%; bottom: 86px; transform: translateX(-50%) translateY(10px);
+    position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(10px);
     background: var(--surface-2); border: 1px solid var(--green); color: var(--text);
     padding: 10px 18px; border-radius: var(--radius); font-size: 13px; opacity: 0;
     transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; white-space: nowrap;
@@ -396,6 +483,28 @@
 
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
+  // Minutos de tolerancia después de la hora de inicio durante los que un turno
+  // todavía se puede reservar/cancelar. 0 = se cierra en punto.
+  const MINUTOS_GRACIA_TURNO = 0;
+
+  // Íconos de línea (mismo trazo para todos, toman el color del texto)
+  const ICONOS = {
+    perfil:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c.7-3.8 3.6-6.1 7.4-6.1s6.7 2.3 7.4 6.1"/></svg>',
+    rutina:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h7.6l3.9 3.9v12.6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M14 3.6v4h4"/><path d="M9.2 12.2h5.6M9.2 15.8h5.6"/></svg>',
+    turnos:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.8" y="5.3" width="16.4" height="15" rx="1.2"/><path d="M3.8 9.8h16.4M8.3 3.5v3.4M15.7 3.5v3.4"/><path d="M8 13.6h2.2M12.9 13.6h3.1M8 16.9h2.2"/></svg>',
+    reservas: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.3l2.6 2.6 4.9-5.4"/></svg>',
+    izq:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>',
+    der:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>',
+  };
+
+  // Encabezado de cada pantalla del cliente: ícono + título + bajada
+  function tituloVista(icono, titulo, sub) {
+    return `
+      <div class="view-title">
+        <span class="view-ico">${ICONOS[icono]}</span>
+        <div><h2>${titulo}</h2><p class="sub">${sub}</p></div>
+      </div>`;
+  }
   const HORARIOS = Array.from({length: 13}, (_, i) => String(i + 8).padStart(2,'0') + ':00');
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const DIAS_CORTO = ['dom','lun','mar','mié','jue','vie','sáb'];
@@ -508,6 +617,8 @@
     asistenciasFecha: null,
     clienteBusqueda: '',
     rutinasAbiertoDni: null,
+    reservasTab: 'proximos', // proximos | asistencias
+    asistMes: null,          // 'YYYY-MM' que se está mirando en el calendario de asistencias
   };
 
   function isoDate(d) {
@@ -528,6 +639,34 @@
       resultado.setDate(0); // retrocede al último día del mes destino correcto
     }
     return resultado;
+  }
+
+  // Momento exacto en que empieza un turno (hora local del dispositivo)
+  function turnoInicio(fechaIso, hora) {
+    return new Date(fechaIso + 'T' + String(hora).slice(0, 5) + ':00');
+  }
+
+  // true si el turno ya empezó (más la tolerancia): desde ahí no se puede
+  // reservar ni cancelar, y pasa a contar como asistencia.
+  function turnoYaEmpezo(fechaIso, hora) {
+    return Date.now() >= turnoInicio(fechaIso, hora).getTime() + MINUTOS_GRACIA_TURNO * 60000;
+  }
+
+  // Estado "real" de una reserva para mostrar y contar:
+  //  - reservado + el turno todavía no empezó  -> 'reservado'
+  //  - reservado + el turno ya empezó          -> 'asistio' (asistencia automática)
+  //  - asistio / no_asistio / cancelado        -> lo que marcó el administrador o el cliente
+  // No se escribe nada extra en la base: la reserva guardada ES el registro de asistencia.
+  function estadoEfectivo(r) {
+    if (r.estado === 'reservado' && turnoYaEmpezo(r.fecha, r.hora)) return 'asistio';
+    return r.estado;
+  }
+
+  // Primer día de la semana reservable que todavía tiene algún horario por delante
+  function primerDiaConTurnos() {
+    const dias = bookableWeekdays();
+    const conTurnos = dias.find(d => HORARIOS.some(h => !turnoYaEmpezo(isoDate(d), h)));
+    return isoDate(conTurnos || dias[0]);
   }
 
   // Lunes de la semana a la que pertenece una fecha (ISO string)
@@ -824,7 +963,7 @@
 
     const hoy = isoDate(new Date());
     const turnosHoy = data.reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
-    const asistieronHoy = data.reservas.filter(r => r.fecha === hoy && r.estado === 'asistio').length;
+    const asistieronHoy = data.reservas.filter(r => r.fecha === hoy && estadoEfectivo(r) === 'asistio').length;
 
     const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
     const sinMatricula = data.clientes.filter(c => !(c.matricula && c.matricula.pagada)).length;
@@ -878,7 +1017,7 @@
     const mesActual = hoy.getMonth();
     const anioActual = hoy.getFullYear();
     const asistencias = data.reservas.filter(r => {
-      if (r.dni !== dni || r.estado !== 'asistio') return false;
+      if (r.dni !== dni || estadoEfectivo(r) !== 'asistio') return false;
       const d = new Date(r.fecha + 'T00:00:00');
       return d.getMonth() === mesActual && d.getFullYear() === anioActual;
     }).sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -1222,21 +1361,27 @@
       `;
     }
 
-    // Modo confirmación: hoy o fechas pasadas
-    const pendientes = turnosDelDia.filter(r => r.estado === 'reservado');
-    const confirmados = turnosDelDia.filter(r => r.estado !== 'reservado');
+    // Hoy o fechas pasadas. La asistencia es automática: cada turno reservado
+    // cuenta como "Asistió" cuando empieza, y acá solo se corrige a quien faltó.
+    const porVenir = turnosDelDia.filter(r => estadoEfectivo(r) === 'reservado');
+    const yaEmpezados = turnosDelDia.filter(r => estadoEfectivo(r) !== 'reservado');
+    const nAsistieron = yaEmpezados.filter(r => estadoEfectivo(r) === 'asistio').length;
+    const nFaltaron = yaEmpezados.filter(r => estadoEfectivo(r) === 'no_asistio').length;
 
-    const renderGrupo = (hora, items) => {
+    const renderGrupo = (hora, items, conBotones) => {
       const filasHtml = items.map(r => {
         const cliente = data.clientes.find(c => c.dni === r.dni);
         const nombre = cliente ? cliente.nombre : r.dni;
+        const ef = estadoEfectivo(r);
+        const botones = conBotones ? `
+            <div class="asist-actions">
+              <button class="asist-btn asist-si ${ef==='asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="asistio">Asistió</button>
+              <button class="asist-btn asist-no ${ef==='no_asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="no_asistio">No asistió</button>
+            </div>` : '';
         return `
           <div class="asist-row">
             <span class="asist-nombre-solo">${nombre}</span>
-            <div class="asist-actions">
-              <button class="asist-btn asist-si ${r.estado==='asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="asistio">Asistió</button>
-              <button class="asist-btn asist-no ${r.estado==='no_asistio'?'active':''}" data-asist-id="${r.id}" data-asist-val="no_asistio">No asistió</button>
-            </div>
+            ${botones}
           </div>`;
       }).join('');
       return `
@@ -1246,23 +1391,30 @@
         </div>`;
     };
 
-    const pendientesHtml = pendientes.length
-      ? agruparPorHora(pendientes).map(g => renderGrupo(g.hora, g.items)).join('')
-      : `<div class="empty-state">No quedan turnos sin confirmar para este día.</div>`;
+    const resumenHtml = turnosDelDia.length
+      ? `<div class="profile-card" style="margin-bottom:16px; padding:8px 16px;">
+           <div class="kv-row"><span class="k">Asistieron</span><span class="v">${nAsistieron}</span></div>
+           <div class="kv-row"><span class="k">No asistieron</span><span class="v">${nFaltaron}</span></div>
+           ${porVenir.length ? `<div class="kv-row"><span class="k">Turnos que todavía no empezaron</span><span class="v">${porVenir.length}</span></div>` : ''}
+         </div>`
+      : '';
 
-    const confirmadosHtml = confirmados.length
-      ? `<details class="cuota-aldiacolapso">
-           <summary>Ya confirmados (${confirmados.length})</summary>
-           <div style="margin-top:10px;">${agruparPorHora(confirmados).map(g => renderGrupo(g.hora, g.items)).join('')}</div>
-         </details>`
+    const empezadosHtml = yaEmpezados.length
+      ? agruparPorHora(yaEmpezados).map(g => renderGrupo(g.hora, g.items, true)).join('')
+      : (turnosDelDia.length ? '' : `<div class="empty-state">Nadie reservó turno este día.</div>`);
+
+    const porVenirHtml = porVenir.length
+      ? `<h2 style="font-size:16px; margin-top:22px;">Todavía no empezaron</h2>
+         ${agruparPorHora(porVenir).map(g => renderGrupo(g.hora, g.items, false)).join('')}`
       : '';
 
     return `
-        <p class="sub">Marcá quién vino a cada turno</p>
+        <p class="sub">Cada turno reservado cuenta como asistencia cuando empieza. Marcá "No asistió" solo si alguien faltó.</p>
         ${atajos}
         <input type="date" id="asistFechaInput" value="${fecha}" class="date-input" />
-        ${pendientesHtml}
-        ${confirmadosHtml}
+        ${resumenHtml}
+        ${empezadosHtml}
+        ${porVenirHtml}
     `;
   }
 
@@ -1297,8 +1449,7 @@
 
     return `
       <div class="view">
-        <h2>Hola, ${cliente.nombre.split(' ')[0]}</h2>
-        <p class="sub">Tu perfil y tu plan en ORIGO</p>
+        ${tituloVista('perfil', 'Hola, ' + cliente.nombre.split(' ')[0], 'Tu perfil y tu plan en ORIGO')}
         ${bloqueado ? `<div class="banner"><b>Membresía ${cliente.estado.toLowerCase()}</b>Mientras tu membresía no esté activa no podés reservar turnos. Hablá con recepción para regularizarla.</div>` : ''}
         ${cuotaBanner}
         <div class="profile-card">
@@ -1341,8 +1492,7 @@
     if (rutinas.length === 0) {
       return `
         <div class="view">
-          <h2>Tu rutina</h2>
-          <p class="sub">El plan que te armó tu profe</p>
+          ${tituloVista('rutina', 'Tu rutina', 'El plan que te armó tu profe')}
           <div class="empty-state">Todavía no tenés una rutina cargada.<br>Hablá con tu profe en ORIGO.</div>
         </div>`;
     }
@@ -1356,8 +1506,7 @@
       </a>`).join('');
     return `
       <div class="view">
-        <h2>Tu rutina</h2>
-        <p class="sub">El plan que te armó tu profe</p>
+        ${tituloVista('rutina', 'Tu rutina', 'El plan que te armó tu profe')}
         ${items}
       </div>`;
   }
@@ -1384,7 +1533,12 @@
     const limiteSemanal = limiteSemanalDe(cliente);
     const limiteSemanalAlcanzado = reservasSemana.length >= limiteSemanal;
 
-    const slots = HORARIOS.map(hora => {
+    // Los horarios que ya empezaron desaparecen de la lista (solo afecta al día de hoy)
+    const horariosVisibles = HORARIOS.filter(h => !turnoYaEmpezo(selectedDate, h));
+    const ocultos = HORARIOS.length - horariosVisibles.length;
+    const quedanOtrosDias = dates.some(d => isoDate(d) > selectedDate);
+
+    const slots = horariosVisibles.map(hora => {
       const ocupados = data.reservas.filter(r => r.fecha === selectedDate && r.hora === hora && r.estado !== 'cancelado').length;
       const disponibles = CUPO - ocupados;
       const miReserva = misReservasHoy.find(r => r.hora === hora);
@@ -1412,69 +1566,194 @@
 
     return `
       <div class="view">
-        <h2>Turnos</h2>
-        <p class="sub">Elegí el día y la hora que te queda mejor</p>
+        ${tituloVista('turnos', 'Turnos', 'Elegí el día y la hora que te queda mejor')}
         <div class="date-scroll">${dchips}</div>
         ${bloqueado ? `<div class="banner"><b>Membresía ${cliente.estado.toLowerCase()}</b>No podés reservar hasta regularizar tu membresía.</div>` : ''}
         ${(!bloqueado && limiteSemanalAlcanzado) ? `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Límite semanal alcanzado</b>Ya reservaste los ${limiteSemanal} turnos que te corresponden esta semana según tu plan. Si necesitás uno extra por una situación puntual, hablalo con tu profe.</div>` : (!bloqueado && limiteDiarioAlcanzado) ? `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Límite diario alcanzado</b>Ya tenés ${MAX_TURNOS_POR_DIA} turnos este día. Desmarcá uno si querés cambiarlo por otro horario.</div>` : ''}
-        <div class="slots-list">${slots}</div>
+        ${(ocultos > 0 && horariosVisibles.length > 0) ? `<p class="slots-nota">Los horarios de hoy que ya pasaron no se muestran.</p>` : ''}
+        ${horariosVisibles.length > 0
+          ? `<div class="slots-list">${slots}</div>`
+          : `<div class="empty-state">Ya no quedan turnos para este día.<br>${quedanOtrosDias ? 'Elegí otro día de la semana.' : 'Desde el sábado vas a poder reservar los de la semana que viene.'}</div>`}
       </div>
     `;
   }
 
   // ---------------- Render: Mis reservas ----------------
+  // Semanas seguidas (lunes a domingo) con al menos una asistencia. Si en la
+  // semana en curso todavía no vino, se cuenta desde la anterior para que la
+  // racha no se "rompa" cada lunes.
+  function rachaSemanas(asistencias) {
+    const semanas = new Set(asistencias.map(r => isoDate(mondayOf(r.fecha))));
+    const cursor = mondayOf(isoDate(new Date()));
+    if (!semanas.has(isoDate(cursor))) cursor.setDate(cursor.getDate() - 7);
+    let n = 0;
+    while (semanas.has(isoDate(cursor))) { n++; cursor.setDate(cursor.getDate() - 7); }
+    return n;
+  }
+
+  function mesShift(ym, delta) {
+    const [y, m] = ym.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  function fechaLarga(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return DIAS_SEMANA[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1);
+  }
+
   function renderMisReservas(cliente, data) {
-    const todas = data.reservas.filter(r => r.dni === cliente.dni && r.estado !== 'cancelado');
-    const hoy = isoDate(new Date());
+    const mias = data.reservas.filter(r => r.dni === cliente.dni && r.estado !== 'cancelado');
+    const proximas = mias.filter(r => estadoEfectivo(r) === 'reservado')
+      .sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+    const asistencias = mias.filter(r => estadoEfectivo(r) === 'asistio');
+    const tab = state.reservasTab === 'asistencias' ? 'asistencias' : 'proximos';
 
-    const proximas = todas.filter(r => r.fecha >= hoy).sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
-    const historial = todas.filter(r => r.fecha < hoy).sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+    const seg = `
+      <div class="seg">
+        <button class="seg-btn ${tab==='proximos'?'active':''}" data-res-tab="proximos">Próximos<span class="seg-count">${proximas.length}</span></button>
+        <button class="seg-btn ${tab==='asistencias'?'active':''}" data-res-tab="asistencias">Asistencias<span class="seg-count">${asistencias.length}</span></button>
+      </div>`;
 
-    const card = (r, permitirCancelar) => {
-      const d = new Date(r.fecha + 'T00:00:00');
-      const dow = DIAS_SEMANA[d.getDay()];
-      let estadoPill = '';
-      if (r.estado === 'asistio') estadoPill = '<span class="pill pill-green">Asistió</span>';
-      else if (r.estado === 'no_asistio') estadoPill = '<span class="pill pill-red">No asistió</span>';
-      else estadoPill = '<span class="pill pill-amber">Reservado</span>';
-      const puedeCancelar = permitirCancelar && r.estado === 'reservado';
-      return `
-        <div class="res-card">
-          <div class="info">
-            <div class="date-line">${r.hora} · ${d.getDate()}/${d.getMonth()+1}</div>
-            <div class="day-line">${dow}</div>
-          </div>
-          <div class="right">
-            ${estadoPill}
-            ${puedeCancelar ? `<button class="cancel-link" data-id="${r.id}">Cancelar</button>` : ''}
-          </div>
-        </div>`;
-    };
-
-    if (todas.length === 0) {
-      return `
-        <div class="view">
-          <h2>Mis reservas</h2>
-          <p class="sub">Tus próximos turnos</p>
-          <div class="empty-state">Todavía no reservaste ningún turno.<br>Andá a la pestaña "Turnos" para anotarte.</div>
-        </div>`;
-    }
-
-    const proximasHtml = proximas.length
-      ? proximas.map(r => card(r, true)).join('')
-      : `<div class="empty-state" style="padding:24px 20px;">No tenés turnos próximos.</div>`;
-
-    const historialHtml = historial.length
-      ? `<h2 style="font-size:16px; margin-top:24px;">Historial</h2>` + historial.map(r => card(r, false)).join('')
-      : '';
+    const cuerpo = tab === 'proximos'
+      ? renderReservasProximas(proximas)
+      : renderReservasAsistencias(cliente, data, mias, asistencias);
 
     return `
       <div class="view">
-        <h2>Mis reservas</h2>
-        <p class="sub">Tus próximos turnos</p>
-        ${proximasHtml}
-        ${historialHtml}
+        ${tituloVista('reservas', 'Mis reservas', 'Tus próximos turnos y tu asistencia')}
+        ${seg}
+        ${cuerpo}
       </div>`;
+  }
+
+  function renderReservasProximas(proximas) {
+    if (proximas.length === 0) {
+      return `<div class="empty-state">No tenés turnos reservados.<br>Andá a "Turnos" para anotarte.</div>`;
+    }
+    return proximas.map(r => `
+        <div class="res-card">
+          <div class="info">
+            <div class="date-line">${String(r.hora).slice(0,5)} hs</div>
+            <div class="day-line">${fechaLarga(r.fecha)}</div>
+          </div>
+          <div class="right">
+            <span class="pill pill-amber">Reservado</span>
+            <button class="cancel-link" data-id="${r.id}">Cancelar</button>
+          </div>
+        </div>`).join('');
+  }
+
+  function renderReservasAsistencias(cliente, data, mias, asistencias) {
+    const hoyIso = isoDate(new Date());
+    const mesHoy = hoyIso.slice(0, 7);
+
+    // --- Números generales ---
+    const esteMes = asistencias.filter(r => r.fecha.slice(0, 7) === mesHoy).length;
+    const total = asistencias.length;
+    const racha = rachaSemanas(asistencias);
+
+    // --- Semana en curso contra el límite del plan ---
+    const limite = limiteSemanalDe(cliente);
+    const turnosSemana = reservasEnSemana(data, cliente.dni, hoyIso).length;
+    const semanaHtml = isFinite(limite) && limite > 0 ? `
+      <div class="asis-semana">
+        <div class="asis-semana-top"><span>Turnos de esta semana</span><span>${turnosSemana} de ${limite}</span></div>
+        <div class="asis-bar"><i style="width:${Math.min(100, Math.round(turnosSemana / limite * 100))}%"></i></div>
+      </div>` : '';
+
+    // --- Calendario del mes elegido ---
+    const fechasMias = mias.map(r => r.fecha).sort();
+    const mesMin = fechasMias.length ? (fechasMias[0].slice(0, 7) < mesHoy ? fechasMias[0].slice(0, 7) : mesHoy) : mesHoy;
+    const ultimaFecha = fechasMias.length ? fechasMias[fechasMias.length - 1].slice(0, 7) : mesHoy;
+    const mesMax = ultimaFecha > mesHoy ? ultimaFecha : mesHoy;
+    let mes = state.asistMes || mesHoy;
+    if (mes < mesMin) mes = mesMin;
+    if (mes > mesMax) mes = mesMax;
+
+    const [anio, mesNum] = mes.split('-').map(Number);
+    const diasEnMes = new Date(anio, mesNum, 0).getDate();
+    const offset = (new Date(anio, mesNum - 1, 1).getDay() + 6) % 7; // semana empieza en lunes
+
+    const porDia = {};
+    mias.filter(r => r.fecha.slice(0, 7) === mes).forEach(r => {
+      (porDia[r.fecha] = porDia[r.fecha] || []).push(estadoEfectivo(r));
+    });
+
+    let celdas = ['L','M','M','J','V','S','D'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+    for (let i = 0; i < offset; i++) celdas += '<div></div>';
+    for (let dia = 1; dia <= diasEnMes; dia++) {
+      const iso = mes + '-' + String(dia).padStart(2, '0');
+      const estados = porDia[iso] || [];
+      const dow = new Date(anio, mesNum - 1, dia).getDay();
+      let cls = '';
+      if (estados.includes('asistio')) cls = 'asistio';
+      else if (estados.includes('no_asistio')) cls = 'falto';
+      else if (estados.includes('reservado')) cls = 'reservado';
+      if (dow === 0 || dow === 6) cls += ' finde';
+      if (iso === hoyIso) cls += ' hoy';
+      celdas += `<div class="cal-day ${cls}">${dia}</div>`;
+    }
+
+    const calendarioHtml = `
+      <div class="cal-card">
+        <div class="cal-head">
+          <button class="cal-nav" data-cal-mes="${mesShift(mes, -1)}" ${mes <= mesMin ? 'disabled' : ''} aria-label="Mes anterior">${ICONOS.izq}</button>
+          <span class="cal-mes">${MESES[mesNum - 1]} ${anio}</span>
+          <button class="cal-nav" data-cal-mes="${mesShift(mes, 1)}" ${mes >= mesMax ? 'disabled' : ''} aria-label="Mes siguiente">${ICONOS.der}</button>
+        </div>
+        <div class="cal-grid">${celdas}</div>
+        <div class="cal-leyenda">
+          <span><i class="asistio"></i>Asististe</span>
+          <span><i class="reservado"></i>Turno reservado</span>
+          <span><i class="falto"></i>Faltaste</span>
+        </div>
+      </div>`;
+
+    // --- Detalle del mes elegido ---
+    const delMes = mias
+      .filter(r => r.fecha.slice(0, 7) === mes && estadoEfectivo(r) !== 'reservado')
+      .sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+    const asistDelMes = delMes.filter(r => estadoEfectivo(r) === 'asistio').length;
+    const nombreMes = MESES[mesNum - 1].toLowerCase();
+    const listaHtml = delMes.length
+      ? `<div class="asis-lista-titulo">${asistDelMes} ${asistDelMes === 1 ? 'asistencia' : 'asistencias'} en ${nombreMes}</div>` +
+        delMes.map(r => `
+          <div class="asis-fila">
+            <div>
+              <div class="dia">${fechaLarga(r.fecha)}</div>
+              <div class="hora">${String(r.hora).slice(0,5)} hs</div>
+            </div>
+            ${estadoEfectivo(r) === 'asistio'
+              ? '<span class="pill pill-green">Asistió</span>'
+              : '<span class="pill pill-red">No asistió</span>'}
+          </div>`).join('')
+      : `<div class="empty-state" style="padding:28px 20px;">No hay asistencias registradas en ${nombreMes}.</div>`;
+
+    // --- Datos sueltos ---
+    let extrasHtml = '';
+    if (total > 0) {
+      const conteoHoras = {};
+      asistencias.forEach(r => { const h = String(r.hora).slice(0,5); conteoHoras[h] = (conteoHoras[h] || 0) + 1; });
+      const horaFrecuente = Object.keys(conteoHoras).sort((a,b) => conteoHoras[b] - conteoHoras[a] || a.localeCompare(b))[0];
+      const ultima = asistencias.slice().sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora))[0];
+      extrasHtml = `
+        <div class="profile-card" style="padding:8px 16px; margin:18px 0 0;">
+          <div class="kv-row"><span class="k">Último entrenamiento</span><span class="v">${fechaLarga(ultima.fecha)}</span></div>
+          <div class="kv-row"><span class="k">Tu horario más frecuente</span><span class="v">${horaFrecuente} hs</span></div>
+        </div>`;
+    }
+
+    return `
+      <div class="asis-stats">
+        <div class="asis-stat"><span class="num">${esteMes}</span><span class="lbl">este mes</span></div>
+        <div class="asis-stat"><span class="num">${total}</span><span class="lbl">en total</span></div>
+        <div class="asis-stat"><span class="num">${racha}</span><span class="lbl">${racha === 1 ? 'semana seguida' : 'semanas seguidas'}</span></div>
+      </div>
+      ${semanaHtml}
+      ${calendarioHtml}
+      ${listaHtml}
+      ${extrasHtml}`;
   }
 
   function renderNav(view) {
@@ -1488,7 +1767,7 @@
       <div class="bottom-nav">
         ${items.map(it => `
           <button class="nav-btn ${view===it.id?'active':''}" data-view="${it.id}">
-            <span class="dot"></span>${it.label}
+            ${ICONOS[it.id]}<span>${it.label}</span>
           </button>`).join('')}
       </div>`;
   }
@@ -1660,7 +1939,12 @@
     document.getElementById('logoutBtn').onclick = onLogout;
 
     root.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.onclick = () => { state.view = btn.dataset.view; renderApp(); };
+      btn.onclick = () => {
+        state.view = btn.dataset.view;
+        // Si la app quedó abierta de un día para el otro, no dejar seleccionado un día que ya pasó
+        if (state.view === 'turnos' && state.selectedDate < isoDate(new Date())) state.selectedDate = primerDiaConTurnos();
+        renderApp();
+      };
     });
 
     if (state.view === 'perfil') {
@@ -1683,12 +1967,20 @@
       root.querySelectorAll('.cancel-link').forEach(btn => {
         btn.onclick = () => cancelarReserva(btn.dataset.id);
       });
+      root.querySelectorAll('[data-res-tab]').forEach(btn => {
+        btn.onclick = () => { state.reservasTab = btn.dataset.resTab; renderApp(); };
+      });
+      root.querySelectorAll('[data-cal-mes]').forEach(btn => {
+        btn.onclick = () => { state.asistMes = btn.dataset.calMes; renderApp(); };
+      });
     }
   }
 
   function onLogout() {
     state.cliente = null;
     state.view = 'perfil';
+    state.reservasTab = 'proximos';
+    state.asistMes = null;
     state.loginError = '';
     renderApp();
   }
@@ -1756,7 +2048,7 @@
     state.cliente = found;
     state.loginError = '';
     state.view = 'perfil';
-    state.selectedDate = isoDate(bookableWeekdays()[0]);
+    state.selectedDate = primerDiaConTurnos();
     renderApp();
   }
 
@@ -1901,7 +2193,12 @@
   async function marcarAsistencia(reservaId, valor) {
     const r = state.data.reservas.find(x => x.id === reservaId);
     if (!r) return;
-    const nuevoEstado = (r.estado === valor) ? 'reservado' : valor; // tocar de nuevo lo deshace
+    // "No asistió" tocado de nuevo se deshace (vuelve a contar como asistencia automática).
+    // "Asistió" deja la asistencia confirmada a mano.
+    let nuevoEstado;
+    if (valor === 'no_asistio') nuevoEstado = (r.estado === 'no_asistio') ? 'reservado' : 'no_asistio';
+    else nuevoEstado = 'asistio';
+    if (nuevoEstado === r.estado) return;
     const { error } = await sb.from('reservas').update({ estado: nuevoEstado }).eq('id', reservaId);
     if (error) { showToast('No se pudo actualizar.'); console.error(error); return; }
     await refreshData();
@@ -1994,6 +2291,11 @@
   }
 
   async function reservarTurno(hora) {
+    if (turnoYaEmpezo(state.selectedDate, hora)) {
+      showToast('Ese turno ya empezó. Elegí uno más tarde.');
+      renderApp();
+      return;
+    }
     const reservasHoy = state.data.reservas.filter(r =>
       r.dni === state.cliente.dni && r.fecha === state.selectedDate && r.estado !== 'cancelado');
     if (reservasHoy.length >= MAX_TURNOS_POR_DIA) {
@@ -2021,6 +2323,12 @@
   }
 
   async function cancelarReserva(id) {
+    const reserva = state.data.reservas.find(x => x.id === id);
+    if (reserva && turnoYaEmpezo(reserva.fecha, reserva.hora)) {
+      showToast('Ese turno ya empezó y no se puede cancelar.');
+      renderApp();
+      return;
+    }
     const { error } = await sb.from('reservas').update({ estado: 'cancelado' }).eq('id', id);
     if (error) { showToast('No se pudo cancelar.'); console.error(error); return; }
     await refreshData();
