@@ -109,14 +109,15 @@
   .estado-select option { background: var(--surface-2); color: var(--text); }
 
   /* ---------- Admin tabs ---------- */
-  .admin-tabs { display: flex; gap: 6px; margin: 4px 0 20px; border-bottom: 1px solid var(--line); }
+  .admin-tabs { display: flex; gap: 6px; margin: 4px 0 20px; border-bottom: 1px solid var(--line); overflow-x: auto; }
   .admin-tab {
+    flex: 0 0 auto; white-space: nowrap;
     background: none; border: none; color: var(--text-muted); font-size: 13px; font-weight: 500;
-    padding: 10px 4px; cursor: pointer; font-family: 'Inter', sans-serif; position: relative; margin-right: 18px;
+    padding: 10px 4px; cursor: pointer; font-family: 'Inter', sans-serif; position: relative; margin-right: 10px;
   }
   .admin-tab.active { color: var(--text); }
   .admin-tab.active::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--green);
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--green);
   }
 
   /* ---------- Resumen ---------- */
@@ -390,6 +391,64 @@
   .asis-fila .dia { font-weight: 500; }
   .asis-fila .hora { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 
+  /* ---------- Mi día (clientes PRO) ---------- */
+  .pro-seccion { font-size: 12px; color: var(--text-muted); margin: 20px 0 8px; }
+  .pro-seccion:first-of-type { margin-top: 0; }
+  .pro-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 10px; }
+  .pro-card-head {
+    width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: none; border: none; color: var(--text); padding: 15px 16px; cursor: pointer;
+    text-align: left; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent;
+  }
+  .pro-card-head .t { font-size: 15px; font-weight: 600; }
+  .pro-card-head .d { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+  .pro-card-body { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+  .pro-ayuda { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin: 12px 0 0; }
+  .well-item { padding: 14px 0 12px; border-bottom: 1px solid var(--line); }
+  .well-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .well-label { font-size: 14px; font-weight: 600; }
+  .well-desc { font-size: 12px; color: var(--green); text-align: right; min-height: 15px; }
+  .well-opts { display: flex; gap: 6px; }
+  .well-opt {
+    flex: 1; height: 44px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    font-family: 'Oswald', sans-serif; font-size: 17px; font-weight: 600; border-radius: var(--radius); cursor: pointer;
+  }
+  .well-opt.active { background: var(--green); border-color: var(--green); color: #F3F6F1; }
+  .well-anchors { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .well-anchors span:last-child { text-align: right; }
+  .escala { display: flex; flex-direction: column; gap: 4px; margin: 12px 0 14px; }
+  .escala-fila {
+    display: flex; align-items: center; gap: 14px; width: 100%; min-height: 42px; padding: 6px 12px;
+    background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius);
+    color: var(--text); cursor: pointer; text-align: left; font-family: 'Inter', sans-serif; font-size: 13px;
+  }
+  .escala-fila .n { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 600; min-width: 24px; text-align: center; }
+  .escala-fila .txt { color: var(--text-muted); }
+  .escala-fila.active { background: var(--green); border-color: var(--green); }
+  .escala-fila.active .txt { color: #F3F6F1; }
+  .pro-campos { display: grid; grid-template-columns: 104px 1fr; gap: 10px; margin-bottom: 14px; }
+  .pro-campos label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); min-width: 0; }
+  .pro-campos input {
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text); width: 100%; min-width: 0;
+    padding: 11px 10px; border-radius: var(--radius); font-size: 16px; font-family: inherit; outline: none;
+  }
+  .pro-campos input:focus { border-color: var(--green); }
+  .pro-sesion {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .pro-sesion .s1 { font-weight: 600; }
+  .pro-sesion .s2 { color: var(--text-muted); font-size: 12px; margin-top: 2px; overflow-wrap: anywhere; }
+  .pro-tabla { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .pro-tabla th { font-size: 11px; font-weight: 500; color: var(--text-muted); text-align: right; padding: 0 4px 8px; }
+  .pro-tabla td { text-align: right; padding: 9px 4px; border-top: 1px solid var(--line); }
+  .pro-tabla th:first-child, .pro-tabla td:first-child { text-align: left; color: var(--text-muted); }
+  .pro-tabla td.vacio { color: var(--text-muted); opacity: 0.45; }
+  .pro-admin-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; }
+  .pro-admin-nombre { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .pro-admin-linea { font-size: 12px; color: var(--text-muted); line-height: 1.6; overflow-wrap: anywhere; }
+  .pro-admin-linea b { color: var(--text); font-weight: 600; }
+
   /* ---------- Rutina ---------- */
   .rutina-card {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -493,9 +552,93 @@
     rutina:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h7.6l3.9 3.9v12.6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M14 3.6v4h4"/><path d="M9.2 12.2h5.6M9.2 15.8h5.6"/></svg>',
     turnos:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.8" y="5.3" width="16.4" height="15" rx="1.2"/><path d="M3.8 9.8h16.4M8.3 3.5v3.4M15.7 3.5v3.4"/><path d="M8 13.6h2.2M12.9 13.6h3.1M8 16.9h2.2"/></svg>',
     reservas: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.3l2.6 2.6 4.9-5.4"/></svg>',
+    midia:    '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12.6h3.7l2.3-6.3 3.7 11.4 2.5-7.5 1.5 2.4h4.7"/></svg>',
     izq:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>',
     der:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>',
   };
+
+  // ---------------- Control diario de clientes PRO ----------------
+  // Las tres escalas están definidas acá: para cambiar un texto de referencia
+  // o una pregunta alcanza con editar estas listas.
+
+  // Wellness (antes de entrenar): 5 preguntas de 1 a 5, donde 5 es lo mejor. Total: 5 a 25.
+  const WELLNESS_ITEMS = [
+    { id: 'fatiga', label: 'Fatiga',            corto: 'Fatiga', ref: { 1: 'Siempre cansado', 2: 'Más cansado de lo normal', 3: 'Normal', 4: 'Fresco', 5: 'Muy fresco' } },
+    { id: 'sueno',  label: 'Calidad del sueño', corto: 'Sueño',  ref: { 1: 'Insomnio', 2: 'Sueño inquieto', 3: 'Me costó dormirme', 4: 'Bueno', 5: 'Muy reparador' } },
+    { id: 'dolor',  label: 'Dolor muscular',    corto: 'Dolor',  ref: { 1: 'Muy dolorido', 2: 'Más dolor o tensión de lo normal', 3: 'Normal', 4: 'Me siento bien', 5: 'Me siento genial' } },
+    { id: 'estres', label: 'Estrés',            corto: 'Estrés', ref: { 1: 'Muy estresado', 2: 'Estresado', 3: 'Normal', 4: 'Relajado', 5: 'Muy relajado' } },
+    { id: 'animo',  label: 'Estado de ánimo',   corto: 'Ánimo',  ref: { 1: 'Muy irritable o decaído', 2: 'Irritable', 3: 'Con menos ganas de lo habitual', 4: 'Bueno en general', 5: 'Muy positivo' } },
+  ];
+  const WELLNESS_MAX = WELLNESS_ITEMS.length * 5;
+
+  // TQR, calidad total de recuperación (antes de entrenar): de 6 a 20.
+  const TQR_ESCALA = [
+    [6, ''], [7, 'Muy, muy mala recuperación'], [8, ''], [9, 'Muy mala recuperación'], [10, ''],
+    [11, 'Mala recuperación'], [12, ''], [13, 'Recuperación razonable'], [14, ''], [15, 'Buena recuperación'],
+    [16, ''], [17, 'Muy buena recuperación'], [18, ''], [19, 'Muy, muy buena recuperación'], [20, ''],
+  ];
+
+  // RPE, esfuerzo percibido de la sesión (después de entrenar): de 0 a 10.
+  const RPE_ESCALA = [
+    [0, 'Reposo'], [1, 'Muy, muy suave'], [2, 'Suave'], [3, 'Moderado'], [4, 'Algo duro'], [5, 'Duro'],
+    [6, ''], [7, 'Muy duro'], [8, ''], [9, ''], [10, 'Máximo'],
+  ];
+
+  function esPro(cliente) { return !!cliente && cliente.plan === 'PRO'; }
+
+  // Texto escrito por un cliente que se muestra en pantalla: siempre pasa por acá
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function registrosDe(data, dni, fecha, tipo) {
+    return (data.registrosPro || [])
+      .filter(r => r.dni === dni && r.fecha === fecha && r.tipo === tipo)
+      .sort((a, b) => String(a.creadoEn || '').localeCompare(String(b.creadoEn || '')));
+  }
+
+  // Todo lo cargado por un cliente PRO en un día. La carga de cada sesión es RPE x minutos.
+  function resumenDiaPro(data, dni, fecha) {
+    const rpes = registrosDe(data, dni, fecha, 'rpe');
+    const conMinutos = rpes.filter(r => r.detalle && r.detalle.minutos > 0);
+    return {
+      wellness: registrosDe(data, dni, fecha, 'wellness')[0] || null,
+      tqr: registrosDe(data, dni, fecha, 'tqr')[0] || null,
+      rpes,
+      carga: conMinutos.length ? conMinutos.reduce((sum, r) => sum + r.valor * r.detalle.minutos, 0) : null,
+    };
+  }
+
+  function textoSesionRpe(r) {
+    const partes = [];
+    if (r.detalle && r.detalle.minutos > 0) partes.push(r.detalle.minutos + ' min', 'carga ' + (r.valor * r.detalle.minutos));
+    if (r.detalle && r.detalle.actividad) partes.push(esc(r.detalle.actividad));
+    return partes.join(' · ');
+  }
+
+  // Tabla con los últimos 7 días (termina en 'hastaIso')
+  function tablaUltimosDiasPro(data, dni, hastaIso) {
+    const filas = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(hastaIso + 'T00:00:00');
+      d.setDate(d.getDate() - i);
+      const iso = isoDate(d);
+      const r = resumenDiaPro(data, dni, iso);
+      const celda = v => (v === null || v === '') ? '<td class="vacio">–</td>' : `<td>${v}</td>`;
+      filas.push(`<tr>
+        <td>${DIAS_CORTO[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</td>
+        ${celda(r.wellness ? r.wellness.valor : null)}
+        ${celda(r.tqr ? r.tqr.valor : null)}
+        ${celda(r.rpes.length ? r.rpes.map(x => x.valor).join(', ') : null)}
+        ${celda(r.carga)}
+      </tr>`);
+    }
+    return `
+      <table class="pro-tabla">
+        <thead><tr><th>Día</th><th>Wellness</th><th>TQR</th><th>RPE</th><th>Carga</th></tr></thead>
+        <tbody>${filas.join('')}</tbody>
+      </table>`;
+  }
 
   // Encabezado de cada pantalla del cliente: ícono + título + bajada
   function tituloVista(icono, titulo, sub) {
@@ -619,6 +762,9 @@
     rutinasAbiertoDni: null,
     reservasTab: 'proximos', // proximos | asistencias
     asistMes: null,          // 'YYYY-MM' que se está mirando en el calendario de asistencias
+    proAbierto: undefined,   // tarjeta abierta en "Mi día": 'wellness' | 'tqr' | 'rpe' | null (undefined = elegir sola la pendiente)
+    proDraft: {},            // lo que el cliente va eligiendo antes de guardar
+    proFecha: null,          // fecha que mira el administrador en la pestaña Pro
   };
 
   function isoDate(d) {
@@ -780,13 +926,14 @@
   }
 
   async function refreshData() {
-    const [clientesRes, reservasRes, pagosRes, rutinasRes, planesRes, configRes] = await Promise.all([
+    const [clientesRes, reservasRes, pagosRes, rutinasRes, planesRes, configRes, registrosProRes] = await Promise.all([
       sb.from('clientes').select('*'),
       sb.from('reservas').select('*'),
       sb.from('pagos').select('*'),
       sb.from('rutinas').select('*'),
       sb.from('planes').select('*'),
       sb.from('config').select('*'),
+      sb.from('registros_pro').select('*'),
     ]);
 
     if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error) {
@@ -815,7 +962,14 @@
       pagos: pagosRes.data.map(pagoDbToJs),
       planes: planesRes.data.map(p => ({ id: p.id, plan: p.plan, dias: p.dias, precio: p.precio })),
       config: configRes.data.map(c => ({ clave: c.clave, valor: c.valor })),
+      // Control diario PRO. Si la tabla todavía no existe en Supabase, el resto de
+      // la app sigue funcionando igual y esta parte queda desactivada.
+      registrosProListo: !registrosProRes.error,
+      registrosPro: registrosProRes.error ? [] : registrosProRes.data.map(r => ({
+        id: r.id, dni: r.dni, fecha: r.fecha, tipo: r.tipo, valor: Number(r.valor), detalle: r.detalle || {}, creadoEn: r.creado_en,
+      })),
     };
+    if (registrosProRes.error) console.warn('Tabla registros_pro no disponible:', registrosProRes.error.message || registrosProRes.error);
   }
 
   function showToast(msg) {
@@ -882,6 +1036,7 @@
       { id: 'planes', label: 'Planes' },
       { id: 'cuotas', label: 'Cuotas' },
       { id: 'asistencias', label: 'Asistencias' },
+      { id: 'pro', label: 'Pro' },
     ];
     return `
       <div class="admin-tabs">
@@ -895,6 +1050,7 @@
     else if (state.adminTab === 'asistencias') body = renderAdminAsistencias(data);
     else if (state.adminTab === 'resumen') body = renderAdminResumen(data);
     else if (state.adminTab === 'planes') body = renderAdminPlanes(data);
+    else if (state.adminTab === 'pro') body = renderAdminPro(data);
     else body = renderAdminClientes(data, formError, formNotice);
 
     return `
@@ -904,6 +1060,74 @@
         ${body}
         <button class="link-btn" id="backToLoginBtn2" style="margin-top:24px;">← Salir de administración</button>
       </div>
+    `;
+  }
+
+  // ---------------- Admin: Pro (control diario) ----------------
+  function renderAdminPro(data) {
+    const hoy = isoDate(new Date());
+    const fecha = state.proFecha || hoy;
+    const ayerD = new Date(hoy + 'T00:00:00');
+    ayerD.setDate(ayerD.getDate() - 1);
+    const ayer = isoDate(ayerD);
+
+    if (!data.registrosProListo) {
+      return `
+        <p class="sub">Control diario de los clientes PRO</p>
+        <div class="banner"><b>Falta activar esta sección</b>Todavía no existe la tabla "registros_pro" en Supabase. Hay que crearla una sola vez para que los clientes PRO puedan cargar Wellness, TQR y RPE.</div>`;
+    }
+
+    const pros = data.clientes.filter(c => esPro(c) && c.estado !== 'Baja')
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    const controles = `
+      <div class="asist-atajos">
+        <button class="date-chip ${fecha===hoy?'active':''}" data-pro-fecha="${hoy}">Hoy</button>
+        <button class="date-chip ${fecha===ayer?'active':''}" data-pro-fecha="${ayer}">Ayer</button>
+      </div>
+      <input type="date" id="proFechaInput" value="${fecha}" max="${hoy}" class="date-input" />`;
+
+    if (pros.length === 0) {
+      return `
+        <p class="sub">Control diario de los clientes PRO</p>
+        <div class="empty-state">No hay clientes con plan PRO.</div>`;
+    }
+
+    const conWellness = pros.filter(c => resumenDiaPro(data, c.dni, fecha).wellness).length;
+
+    const tarjetas = pros.map(c => {
+      const r = resumenDiaPro(data, c.dni, fecha);
+      const wellDetalle = r.wellness
+        ? `<div class="pro-admin-linea">${WELLNESS_ITEMS.map(i => `${i.corto} <b>${r.wellness.detalle[i.id] ?? '–'}</b>`).join(' · ')}</div>`
+        : '';
+      const sesiones = r.rpes.map(x => {
+        const extra = textoSesionRpe(x);
+        return `<div class="pro-admin-linea">RPE <b>${x.valor}</b>${extra ? ' · ' + extra : ''}</div>`;
+      }).join('');
+      return `
+        <div class="pro-admin-card">
+          <div class="pro-admin-nombre">${c.nombre}</div>
+          <div class="asis-stats" style="margin-bottom:10px;">
+            <div class="asis-stat"><span class="num">${r.wellness ? r.wellness.valor : '–'}</span><span class="lbl">Wellness (de ${WELLNESS_MAX})</span></div>
+            <div class="asis-stat"><span class="num">${r.tqr ? r.tqr.valor : '–'}</span><span class="lbl">TQR (6 a 20)</span></div>
+            <div class="asis-stat"><span class="num">${r.carga !== null ? r.carga : (r.rpes.length ? r.rpes.map(x => x.valor).join(', ') : '–')}</span><span class="lbl">${r.carga !== null ? 'Carga del día' : 'RPE (0 a 10)'}</span></div>
+          </div>
+          ${wellDetalle}
+          ${sesiones}
+          <details class="cuota-aldiacolapso" style="margin-top:10px;">
+            <summary>Últimos 7 días</summary>
+            <div style="margin-top:12px;">${tablaUltimosDiasPro(data, c.dni, fecha)}</div>
+          </details>
+        </div>`;
+    }).join('');
+
+    return `
+        <p class="sub">Control diario de los clientes PRO</p>
+        ${controles}
+        <div class="profile-card" style="margin-bottom:16px; padding:8px 16px;">
+          <div class="kv-row"><span class="k">Cargaron el wellness</span><span class="v">${conWellness} de ${pros.length}</span></div>
+        </div>
+        ${tarjetas}
     `;
   }
 
@@ -1486,6 +1710,212 @@
     `;
   }
 
+  // ---------------- Render: Mi día (solo PRO) ----------------
+  function renderEscala(tipo, escala, seleccionado) {
+    return `
+      <div class="escala" data-escala="${tipo}">
+        ${escala.map(([n, txt]) => `
+          <button class="escala-fila ${seleccionado === n ? 'active' : ''}" data-val="${n}">
+            <span class="n">${n}</span><span class="txt">${txt}</span>
+          </button>`).join('')}
+      </div>`;
+  }
+
+  function renderMiDia(cliente, data) {
+    const hoy = isoDate(new Date());
+    const titulo = tituloVista('midia', 'Mi día', 'Tu control diario del ' + fechaLarga(hoy).toLowerCase());
+
+    if (!data.registrosProListo) {
+      return `
+        <div class="view">
+          ${titulo}
+          <div class="empty-state">El control diario todavía no está disponible.<br>Avisale a tu profe en ORIGO.</div>
+        </div>`;
+    }
+
+    const r = resumenDiaPro(data, cliente.dni, hoy);
+    // Si el cliente todavía no tocó nada, se abre sola la primera tarjeta pendiente
+    const abierto = state.proAbierto === undefined
+      ? (!r.wellness ? 'wellness' : (!r.tqr ? 'tqr' : null))
+      : state.proAbierto;
+    const draft = state.proDraft;
+    const pendiente = '<span class="pill pill-amber">Pendiente</span>';
+
+    // --- Wellness ---
+    const dw = draft.wellness || {};
+    const totalDraft = WELLNESS_ITEMS.reduce((sum, i) => sum + (dw[i.id] || 0), 0);
+    const completo = WELLNESS_ITEMS.every(i => dw[i.id]);
+    const wellnessBody = abierto !== 'wellness' ? '' : `
+      <div class="pro-card-body">
+        <p class="pro-ayuda">Marcá cómo te sentís hoy, antes de entrenar. En cada pregunta 1 es lo peor y 5 lo mejor.</p>
+        ${WELLNESS_ITEMS.map(i => `
+          <div class="well-item" data-well-item="${i.id}">
+            <div class="well-top">
+              <span class="well-label">${i.label}</span>
+              <span class="well-desc">${dw[i.id] ? i.ref[dw[i.id]] : ''}</span>
+            </div>
+            <div class="well-opts">
+              ${[1,2,3,4,5].map(n => `<button class="well-opt ${dw[i.id] === n ? 'active' : ''}" data-val="${n}">${n}</button>`).join('')}
+            </div>
+            <div class="well-anchors"><span>1 · ${i.ref[1]}</span><span>5 · ${i.ref[5]}</span></div>
+          </div>`).join('')}
+        <div class="kv-row" style="padding-top:14px;"><span class="k">Total</span><span class="v" id="wellTotal">${completo ? totalDraft + ' de ' + WELLNESS_MAX : '– de ' + WELLNESS_MAX}</span></div>
+        <div class="error-text" id="proError"></div>
+        <button class="btn btn-primary" id="guardarWellnessBtn" style="width:100%; margin-top:6px;">Guardar wellness</button>
+      </div>`;
+
+    // --- TQR ---
+    const tqrBody = abierto !== 'tqr' ? '' : `
+      <div class="pro-card-body">
+        <p class="pro-ayuda">¿Qué tan recuperado te sentís desde tu último entrenamiento? Elegí el número que mejor te describe.</p>
+        ${renderEscala('tqr', TQR_ESCALA, draft.tqr)}
+        <div class="error-text" id="proError"></div>
+        <button class="btn btn-primary" id="guardarTqrBtn" style="width:100%; margin-top:6px;">Guardar TQR</button>
+      </div>`;
+
+    // --- RPE ---
+    const sesionesHtml = r.rpes.map(x => {
+      const extra = textoSesionRpe(x);
+      return `
+        <div class="pro-sesion">
+          <div>
+            <div class="s1">RPE ${x.valor}</div>
+            ${extra ? `<div class="s2">${extra}</div>` : ''}
+          </div>
+          <button class="cancel-link" data-del-registro="${x.id}">Borrar</button>
+        </div>`;
+    }).join('');
+    const rpeBody = abierto !== 'rpe' ? '' : `
+      <div class="pro-card-body">
+        ${sesionesHtml}
+        <p class="pro-ayuda">¿Qué tan duro fue el entrenamiento en general? Cargá una sesión por cada entrenamiento del día, también los que hacés fuera de ORIGO.</p>
+        ${renderEscala('rpe', RPE_ESCALA, draft.rpe)}
+        <div class="pro-campos">
+          <label>Duración (min)<input type="text" inputmode="numeric" id="rpeMinutos" placeholder="Ej: 60" autocomplete="off"></label>
+          <label>¿Qué hiciste?<input type="text" id="rpeActividad" maxlength="60" placeholder="Ej: entrenamiento con el club" autocomplete="off"></label>
+        </div>
+        <div class="error-text" id="proError"></div>
+        <button class="btn btn-primary" id="guardarRpeBtn" style="width:100%; margin-top:6px;">Guardar sesión</button>
+      </div>`;
+
+    const card = (tipo, tit, desc, estadoHtml, body) => `
+      <div class="pro-card">
+        <button class="pro-card-head" data-pro-toggle="${tipo}" aria-expanded="${abierto === tipo}">
+          <div><div class="t">${tit}</div><div class="d">${desc}</div></div>
+          ${estadoHtml}
+        </button>
+        ${body}
+      </div>`;
+
+    return `
+      <div class="view">
+        ${titulo}
+        <div class="pro-seccion">Antes de entrenar</div>
+        ${card('wellness', 'Wellness', 'Cómo llegás hoy: fatiga, sueño, dolor, estrés y ánimo',
+            r.wellness ? `<span class="pill pill-green">${r.wellness.valor} de ${WELLNESS_MAX}</span>` : pendiente, wellnessBody)}
+        ${card('tqr', 'TQR', 'Calidad de tu recuperación, de 6 a 20',
+            r.tqr ? `<span class="pill pill-green">${r.tqr.valor}</span>` : pendiente, tqrBody)}
+        <div class="pro-seccion">Después de entrenar</div>
+        ${card('rpe', 'RPE', 'Esfuerzo percibido de la sesión, de 0 a 10',
+            r.rpes.length ? `<span class="pill pill-green">${r.rpes.length} ${r.rpes.length === 1 ? 'sesión' : 'sesiones'}</span>` : pendiente, rpeBody)}
+        <div class="pro-seccion">Tus últimos 7 días</div>
+        <div class="pro-card" style="padding:14px 14px 6px;">${tablaUltimosDiasPro(data, cliente.dni, hoy)}</div>
+      </div>`;
+  }
+
+  // Abre o cierra una tarjeta de "Mi día". Al abrir una ya cargada, arranca
+  // con los valores guardados para poder corregirlos.
+  function toggleCardPro(tipo) {
+    const hoy = isoDate(new Date());
+    const r = resumenDiaPro(state.data, state.cliente.dni, hoy);
+    const abiertoAhora = state.proAbierto === undefined
+      ? (!r.wellness ? 'wellness' : (!r.tqr ? 'tqr' : null))
+      : state.proAbierto;
+    if (abiertoAhora === tipo) { state.proAbierto = null; renderApp(); return; }
+    state.proAbierto = tipo;
+    state.proDraft = {};
+    if (tipo === 'wellness' && r.wellness) state.proDraft.wellness = Object.assign({}, r.wellness.detalle);
+    if (tipo === 'tqr' && r.tqr) state.proDraft.tqr = r.tqr.valor;
+    renderApp();
+  }
+
+  function mostrarErrorPro(msg) {
+    const el = document.getElementById('proError');
+    if (el) el.textContent = msg;
+  }
+
+  // Guarda un registro del día. Wellness y TQR son uno por día (si ya existe se
+  // actualiza); RPE admite varias sesiones por día.
+  async function guardarRegistroPro(tipo, valor, detalle, unoPorDia) {
+    const hoy = isoDate(new Date());
+    const dni = state.cliente.dni;
+    const existente = unoPorDia ? registrosDe(state.data, dni, hoy, tipo)[0] : null;
+    const res = existente
+      ? await sb.from('registros_pro').update({ valor, detalle }).eq('id', existente.id)
+      : await sb.from('registros_pro').insert({
+          id: 'g' + Date.now() + Math.random().toString(36).slice(2, 7), dni, fecha: hoy, tipo, valor, detalle,
+        });
+    if (res.error) { mostrarErrorPro('No se pudo guardar. Probá de nuevo.'); console.error(res.error); return false; }
+    await refreshData();
+    return true;
+  }
+
+  async function guardarWellness() {
+    const d = state.proDraft.wellness || {};
+    if (!WELLNESS_ITEMS.every(i => d[i.id])) { mostrarErrorPro('Te falta responder alguna de las 5 preguntas.'); return; }
+    const detalle = {};
+    WELLNESS_ITEMS.forEach(i => { detalle[i.id] = d[i.id]; });
+    const total = WELLNESS_ITEMS.reduce((sum, i) => sum + d[i.id], 0);
+    if (!(await guardarRegistroPro('wellness', total, detalle, true))) return;
+    state.proDraft = {};
+    state.proAbierto = undefined; // pasa sola a la siguiente pendiente
+    showToast('Wellness guardado');
+    renderApp();
+    window.scrollTo(0, 0);
+  }
+
+  async function guardarTqr() {
+    const v = state.proDraft.tqr;
+    if (v == null) { mostrarErrorPro('Elegí un número de la escala.'); return; }
+    if (!(await guardarRegistroPro('tqr', v, {}, true))) return;
+    state.proDraft = {};
+    state.proAbierto = null;
+    showToast('TQR guardado');
+    renderApp();
+    window.scrollTo(0, 0);
+  }
+
+  async function guardarRpe() {
+    const v = state.proDraft.rpe;
+    if (v == null) { mostrarErrorPro('Elegí un número de la escala.'); return; }
+    const minTexto = document.getElementById('rpeMinutos').value.trim();
+    const actividad = document.getElementById('rpeActividad').value.trim().slice(0, 60);
+    let minutos = null;
+    if (minTexto !== '') {
+      minutos = parseInt(minTexto, 10);
+      if (!/^\d+$/.test(minTexto) || minutos <= 0 || minutos > 600) { mostrarErrorPro('La duración tiene que ser un número de minutos (por ejemplo 60).'); return; }
+    }
+    const detalle = {};
+    if (minutos) detalle.minutos = minutos;
+    if (actividad) detalle.actividad = actividad;
+    if (!(await guardarRegistroPro('rpe', v, detalle, false))) return;
+    state.proDraft = {};
+    state.proAbierto = null;
+    showToast('Sesión guardada');
+    renderApp();
+    window.scrollTo(0, 0);
+  }
+
+  async function borrarRegistroPro(id) {
+    const reg = (state.data.registrosPro || []).find(x => x.id === id);
+    if (!reg || reg.dni !== state.cliente.dni) return;
+    const { error } = await sb.from('registros_pro').delete().eq('id', id);
+    if (error) { showToast('No se pudo borrar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Sesión borrada');
+    renderApp();
+  }
+
   // ---------------- Render: Rutina ----------------
   function renderRutina(cliente) {
     const rutinas = cliente.rutinas || [];
@@ -1758,6 +2188,7 @@
 
   function renderNav(view) {
     const items = [
+      ...(esPro(state.cliente) ? [{id:'midia', label:'Mi día'}] : []),
       {id:'perfil', label:'Perfil'},
       {id:'rutina', label:'Rutina'},
       {id:'turnos', label:'Turnos'},
@@ -1792,6 +2223,9 @@
           renderApp();
         };
       });
+
+      const tabActiva = root.querySelector('.admin-tab.active');
+      if (tabActiva) tabActiva.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
       document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; state.editingDni = null; renderApp(); };
 
@@ -1866,6 +2300,14 @@
         });
       }
 
+      if (state.adminTab === 'pro') {
+        const proFechaInput = document.getElementById('proFechaInput');
+        if (proFechaInput) proFechaInput.onchange = (e) => { state.proFecha = e.target.value || null; renderApp(); };
+        root.querySelectorAll('[data-pro-fecha]').forEach(btn => {
+          btn.onclick = () => { state.proFecha = btn.dataset.proFecha; renderApp(); };
+        });
+      }
+
       if (state.adminTab === 'cuotas') {
         root.querySelectorAll('[data-registrar-pago]').forEach(btn => {
           btn.onclick = () => {
@@ -1915,8 +2357,11 @@
       return;
     }
 
+    if (state.view === 'midia' && !esPro(state.cliente)) state.view = 'perfil';
+
     let body = '';
     if (state.view === 'perfil') body = renderPerfil(state.cliente, state.data);
+    else if (state.view === 'midia') body = renderMiDia(state.cliente, state.data);
     else if (state.view === 'rutina') body = renderRutina(state.cliente);
     else if (state.view === 'turnos') body = renderTurnos(state.cliente, state.data, state.selectedDate);
     else body = renderMisReservas(state.cliente, state.data);
@@ -1946,6 +2391,50 @@
         renderApp();
       };
     });
+
+    if (state.view === 'midia') {
+      root.querySelectorAll('[data-pro-toggle]').forEach(btn => {
+        btn.onclick = () => toggleCardPro(btn.dataset.proToggle);
+      });
+      // Elegir una opción solo marca el botón y actualiza el borrador: no se
+      // vuelve a dibujar la pantalla, así no salta el scroll mientras se completa.
+      root.querySelectorAll('[data-well-item]').forEach(item => {
+        const def = WELLNESS_ITEMS.find(i => i.id === item.dataset.wellItem);
+        item.querySelectorAll('.well-opt').forEach(btn => {
+          btn.onclick = () => {
+            const n = parseInt(btn.dataset.val, 10);
+            state.proDraft.wellness = state.proDraft.wellness || {};
+            state.proDraft.wellness[def.id] = n;
+            item.querySelectorAll('.well-opt').forEach(b => b.classList.toggle('active', b === btn));
+            item.querySelector('.well-desc').textContent = def.ref[n];
+            const d = state.proDraft.wellness;
+            const listo = WELLNESS_ITEMS.every(i => d[i.id]);
+            const total = WELLNESS_ITEMS.reduce((sum, i) => sum + (d[i.id] || 0), 0);
+            document.getElementById('wellTotal').textContent = (listo ? total : '–') + ' de ' + WELLNESS_MAX;
+            mostrarErrorPro('');
+          };
+        });
+      });
+      root.querySelectorAll('[data-escala]').forEach(grupo => {
+        grupo.querySelectorAll('.escala-fila').forEach(btn => {
+          btn.onclick = () => {
+            state.proDraft[grupo.dataset.escala] = parseInt(btn.dataset.val, 10);
+            grupo.querySelectorAll('.escala-fila').forEach(b => b.classList.toggle('active', b === btn));
+            mostrarErrorPro('');
+          };
+        });
+      });
+      const gw = document.getElementById('guardarWellnessBtn'); if (gw) gw.onclick = guardarWellness;
+      const gt = document.getElementById('guardarTqrBtn'); if (gt) gt.onclick = guardarTqr;
+      const gr = document.getElementById('guardarRpeBtn'); if (gr) gr.onclick = guardarRpe;
+      ['rpeMinutos', 'rpeActividad'].forEach(id => {
+        const campo = document.getElementById(id);
+        if (campo) campo.oninput = () => mostrarErrorPro('');
+      });
+      root.querySelectorAll('[data-del-registro]').forEach(btn => {
+        btn.onclick = () => borrarRegistroPro(btn.dataset.delRegistro);
+      });
+    }
 
     if (state.view === 'perfil') {
       const cambiarBtn = document.getElementById('cambiarPassBtn');
@@ -1981,6 +2470,8 @@
     state.view = 'perfil';
     state.reservasTab = 'proximos';
     state.asistMes = null;
+    state.proAbierto = undefined;
+    state.proDraft = {};
     state.loginError = '';
     renderApp();
   }
@@ -2047,7 +2538,10 @@
     }
     state.cliente = found;
     state.loginError = '';
-    state.view = 'perfil';
+    // Los clientes PRO entran directo a su control diario
+    state.view = esPro(found) ? 'midia' : 'perfil';
+    state.proAbierto = undefined;
+    state.proDraft = {};
     state.selectedDate = primerDiaConTurnos();
     renderApp();
   }
@@ -2208,6 +2702,8 @@
   async function eliminarCliente(dni) {
     const { error } = await sb.from('clientes').delete().eq('dni', dni);
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
+    // Sus registros de control diario se borran con él (si la tabla existe)
+    if (state.data.registrosProListo) await sb.from('registros_pro').delete().eq('dni', dni);
     await refreshData();
     showToast('Cliente eliminado');
     renderApp();
