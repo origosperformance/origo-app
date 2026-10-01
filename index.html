@@ -179,6 +179,25 @@
   .cuota-nombre { font-size: 14px; font-weight: 600; }
   .pago-detalle { font-size: 12px; color: var(--text-muted); }
   .pago-registrar { display: flex; gap: 8px; margin-top: 10px; }
+  input[type=text].pago-nota-input {
+    width: 100%; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 9px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit; outline: none;
+  }
+  input[type=text].pago-nota-input:focus { border-color: var(--green); }
+  .pago-preview { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .pago-hist { margin: 8px 0 2px; }
+  .pago-hist summary { font-size: 12px; color: var(--green); cursor: pointer; padding: 4px 0; list-style: none; }
+  .pago-hist summary::-webkit-details-marker { display: none; }
+  .pago-hist summary::before { content: '▸ '; font-size: 10px; }
+  .pago-hist[open] summary::before { content: '▾ '; }
+  .pago-fila {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+    padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px;
+  }
+  .pago-fila .p1 { font-weight: 500; }
+  .pago-fila .p2 { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; overflow-wrap: anywhere; }
+  .pago-fila .monto { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .pago-total { display: flex; justify-content: space-between; padding: 9px 0 2px; border-top: 1px solid var(--line); font-size: 12px; color: var(--text-muted); }
   .plan-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
   .plan-row:last-child { border-bottom: none; }
   .plan-row-dias { flex: 1; font-size: 13px; color: var(--text-muted); }
@@ -908,14 +927,19 @@
     return {
       id: p.id, dni: p.dni, fechaPago: p.fecha_pago, duracionId: p.duracion_id, dias: p.dias,
       monto: p.monto, metodoPago: p.metodo_pago, fechaVencimiento: p.fecha_vencimiento,
+      comprobante: p.comprobante || null,
     };
   }
 
   function pagoJsToDb(p) {
-    return {
+    const fila = {
       id: p.id, dni: p.dni, fecha_pago: p.fechaPago, duracion_id: p.duracionId, dias: p.dias,
       monto: p.monto, metodo_pago: p.metodoPago, fecha_vencimiento: p.fechaVencimiento,
     };
+    // El comprobante solo se manda si se escribió algo, así la app sigue
+    // funcionando aunque la columna todavía no exista en la base.
+    if (p.comprobante) fila.comprobante = p.comprobante;
+    return fila;
   }
 
   async function sembrarPlanesIniciales() {
@@ -1142,7 +1166,7 @@
     const planesHtml = ordenPlanes.filter(p => grupos[p]).map(plan => {
       const filas = grupos[plan].map(p => `
         <div class="plan-row">
-          <span class="plan-row-dias">${p.dias ? p.dias + ' días/sem' : 'Integral'}</span>
+          <span class="plan-row-dias">${p.dias ? p.dias + (p.dias === 1 ? ' día/sem' : ' días/sem') : 'Integral'}</span>
           <input type="text" inputmode="numeric" class="plan-precio-input" data-plan-id="${p.id}" value="${p.precio}">
           <button class="cancel-link" data-guardar-plan="${p.id}">Guardar</button>
         </div>`).join('');
@@ -1165,6 +1189,15 @@
             <input type="text" inputmode="numeric" class="plan-precio-input" id="matriculaPrecioInput" value="${matricula}">
             <button class="cancel-link" id="guardarMatriculaBtn">Guardar</button>
           </div>
+        </div>
+        <div class="cuota-card" style="margin-top:10px;">
+          <div class="cuota-nombre" style="margin-bottom:8px;">Plazo de pago</div>
+          <div class="plan-row">
+            <span class="plan-row-dias">Días para pagar la cuota</span>
+            <input type="text" inputmode="numeric" class="plan-precio-input" id="diasParaPagarInput" value="${diasParaPagar()}">
+            <button class="cancel-link" id="guardarDiasParaPagarBtn">Guardar</button>
+          </div>
+          <div class="pago-detalle" style="margin-top:8px;">Se cuenta desde el día del vencimiento. Con ${diasParaPagar()} ${diasParaPagar() === 1 ? 'día' : 'días'}, una cuota que vence el 1 se puede pagar hasta el ${diasParaPagar()} sin figurar vencida.</div>
         </div>
         <div class="banner" style="border-color:var(--line); background:var(--surface-2); margin-top:16px;">
           <b style="color:var(--text-muted);">Ojo</b>Cambiar un precio acá no le modifica la cuota a nadie que ya esté pagando — solo se usa para calcularle el monto a un cliente nuevo o la próxima vez que alguien registre un pago.
@@ -1196,7 +1229,7 @@
     const itemsAtencion = [
       { count: vencidos + sinPagos, label: (vencidos+sinPagos)===1 ? 'cliente con la cuenta vencida o sin pagos' : 'clientes con la cuenta vencida o sin pagos', tab: 'cuotas', sev: 'urgente' },
       { count: pausasVencidas, label: pausasVencidas===1 ? 'pausa superó el límite de 3 meses' : 'pausas superaron el límite de 3 meses', tab: 'clientes', sev: 'urgente' },
-      { count: vencePronto, label: vencePronto===1 ? 'cliente vence esta semana' : 'clientes vencen esta semana', tab: 'cuotas', sev: 'atencion' },
+      { count: vencePronto, label: vencePronto===1 ? 'cliente con la cuota por vencer o para pagar' : 'clientes con la cuota por vencer o para pagar', tab: 'cuotas', sev: 'atencion' },
       { count: sinMatricula, label: sinMatricula===1 ? 'cliente sin matrícula pagada' : 'clientes sin matrícula pagada', tab: 'clientes', sev: 'atencion' },
     ].filter(i => i.count > 0);
 
@@ -1403,49 +1436,191 @@
     return pagos[0] || null;
   }
 
+  // ---- Plazo de pago ----
+  // Cantidad de días que hay para pagar la cuota, contando el día del
+  // vencimiento. Con 10: una cuota que vence el 1 se puede pagar hasta el 10
+  // sin figurar vencida. Se cambia desde la pestaña Planes.
+  const DIAS_PARA_PAGAR_DEFECTO = 10;
+  function diasParaPagar() {
+    const fila = state.data && state.data.config ? state.data.config.find(c => c.clave === 'dias_para_pagar') : null;
+    const n = fila ? parseInt(fila.valor, 10) : NaN;
+    return n >= 1 ? n : DIAS_PARA_PAGAR_DEFECTO;
+  }
+
+  function sumarDias(fechaIso, n) {
+    const d = new Date(fechaIso + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return isoDate(d);
+  }
+
+  // Último día para pagar una cuota que venció en 'vencIso'
+  function limitePago(vencIso) {
+    return sumarDias(vencIso, diasParaPagar() - 1);
+  }
+
+  function formatFecha(iso) {
+    const [y, m, d] = iso.split('-');
+    return d + '/' + m + '/' + y;
+  }
+
+  function diasEntre(desdeIso, hastaIso) {
+    return Math.round((new Date(hastaIso + 'T00:00:00') - new Date(desdeIso + 'T00:00:00')) / 86400000);
+  }
+
+  // Estados posibles:
+  //  'Sin pagos'          nunca pagó
+  //  'Al día'             todavía no llegó (o es hoy) el vencimiento
+  //  'En período de pago' ya venció pero está dentro del plazo para pagar
+  //  'Vencido'            se pasó del plazo
   function estadoCuenta(data, dni) {
     const ultimo = ultimoPagoDe(data, dni);
-    if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, ultimo: null };
+    if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, limite: null, ultimo: null };
     const hoy = isoDate(new Date());
-    return { estado: hoy > ultimo.fechaVencimiento ? 'Vencido' : 'Al día', vencimiento: ultimo.fechaVencimiento, ultimo };
+    const vencimiento = ultimo.fechaVencimiento;
+    const limite = limitePago(vencimiento);
+    let estado = 'Al día';
+    if (hoy > limite) estado = 'Vencido';
+    else if (hoy > vencimiento) estado = 'En período de pago';
+    return { estado, vencimiento, limite, ultimo };
   }
 
   const DIAS_AVISO_VENCIMIENTO = 7;
 
   // Como estadoCuenta pero con prioridad de atención: 0 = urgente (vencido/sin pagos),
-  // 1 = vence pronto (dentro de los próximos 7 días), 2 = tranquilo (al día, con margen)
+  // 1 = por vencer o en período de pago, 2 = tranquilo (al día, con margen)
   function cuotaDisplay(data, dni) {
     const cuenta = estadoCuenta(data, dni);
     if (cuenta.estado === 'Vencido') return { ...cuenta, label: 'Vencido', pill: 'pill-red', prioridad: 0, diasRestantes: null };
     if (cuenta.estado === 'Sin pagos') return { ...cuenta, label: 'Sin pagos', pill: 'pill-red', prioridad: 0, diasRestantes: null };
-    const hoy = todayMidnight();
-    const venc = new Date(cuenta.vencimiento + 'T00:00:00');
-    const diasRestantes = Math.round((venc - hoy) / 86400000);
+    const hoyIso = isoDate(new Date());
+    if (cuenta.estado === 'En período de pago') {
+      return { ...cuenta, label: 'Para pagar', pill: 'pill-amber', prioridad: 1, diasRestantes: diasEntre(hoyIso, cuenta.limite) };
+    }
+    const diasRestantes = diasEntre(hoyIso, cuenta.vencimiento);
     if (diasRestantes <= DIAS_AVISO_VENCIMIENTO) {
       return { ...cuenta, label: 'Vence pronto', pill: 'pill-amber', prioridad: 1, diasRestantes };
     }
     return { ...cuenta, label: 'Al día', pill: 'pill-green', prioridad: 2, diasRestantes };
   }
 
-  async function registrarNuevoPago(dni, duracionId, metodoPago) {
+  // Desde qué fecha cuenta el próximo pago de un cliente:
+  //  - si está al día o dentro del plazo de pago, sigue desde el vencimiento
+  //    anterior (no pierde días por pagar antes ni corre la fecha por pagar unos días después)
+  //  - si nunca pagó o se pasó del plazo, cuenta desde hoy
+  function baseProximoPago(data, dni) {
+    const cuenta = estadoCuenta(data, dni);
+    if (cuenta.ultimo && cuenta.estado !== 'Vencido') return new Date(cuenta.vencimiento + 'T00:00:00');
+    return todayMidnight();
+  }
+
+  function periodoNuevoPago(data, dni, duracionId) {
     const dur = DURACIONES.find(d => d.id === duracionId);
+    const base = baseProximoPago(data, dni);
+    const venc = calcularVencimiento(base, dur);
+    return { dur, base, venc };
+  }
+
+  // Inicio del período que cubre un pago ya registrado
+  function inicioPeriodo(p) {
+    return sumarDias(p.fechaVencimiento, -(p.dias || 0));
+  }
+
+  function pagosDe(data, dni) {
+    return data.pagos.filter(p => p.dni === dni)
+      .sort((a, b) => (b.fechaVencimiento + b.fechaPago).localeCompare(a.fechaVencimiento + a.fechaPago));
+  }
+
+  async function registrarNuevoPago(dni, duracionId, metodoPago, comprobante) {
     const cliente = state.data.clientes.find(c => c.dni === dni);
-    if (!dur || !cliente) return;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    const venc = calcularVencimiento(hoy, dur);
-    const diasReales = Math.round((venc - hoy) / 86400000);
+    if (!DURACIONES.find(d => d.id === duracionId) || !cliente) return;
+    const { dur, base, venc } = periodoNuevoPago(state.data, dni, duracionId);
+    const diasReales = Math.round((venc - base) / 86400000);
     const monto = Math.round((cliente.precio || 0) * dur.factor);
+    const nota = String(comprobante || '').trim().slice(0, 80);
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
-      dni, fechaPago: isoDate(hoy), duracionId, dias: diasReales, monto, metodoPago,
+      dni, fechaPago: isoDate(new Date()), duracionId, dias: diasReales, monto, metodoPago,
       fechaVencimiento: isoDate(venc),
+      comprobante: nota || null,
     };
-    const { error } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+    let { error } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+    let comprobanteNoGuardado = false;
+    if (error && nuevoPago.comprobante) {
+      // Lo más probable: la columna "comprobante" todavía no existe. Se registra el pago igual.
+      console.error(error);
+      const reintento = await sb.from('pagos').insert(pagoJsToDb({ ...nuevoPago, comprobante: null }));
+      error = reintento.error;
+      comprobanteNoGuardado = !reintento.error;
+    }
     if (error) { showToast('No se pudo registrar el pago.'); console.error(error); return; }
     await refreshData();
-    showToast('Pago registrado: ' + dur.label + ' · vence ' + formatFechaCorta(isoDate(venc)));
+    showToast(comprobanteNoGuardado
+      ? 'Pago registrado. El comprobante no se pudo guardar.'
+      : 'Pago registrado: ' + dur.label + ' · vence ' + formatFechaCorta(isoDate(venc)));
     renderApp();
+  }
+
+  async function guardarDiasParaPagar(valorTexto) {
+    const valor = parseInt(String(valorTexto).replace(/[^\d]/g, ''), 10);
+    if (!valor || valor < 1 || valor > 31) {
+      showToast('Ingresá un número de días entre 1 y 31.');
+      return;
+    }
+    const existe = state.data.config.some(c => c.clave === 'dias_para_pagar');
+    const { error } = existe
+      ? await sb.from('config').update({ valor }).eq('clave', 'dias_para_pagar')
+      : await sb.from('config').insert({ clave: 'dias_para_pagar', valor });
+    if (error) { showToast('No se pudo guardar.'); console.error(error); return; }
+    await refreshData();
+    showToast('Plazo de pago actualizado');
+    renderApp();
+  }
+
+  // Descarga todos los pagos en un archivo que abre Excel (CSV separado por punto y coma)
+  function descargarPagosExcel() {
+    const celda = (v) => {
+      let t = String(v == null ? '' : v);
+      if (/^[=+\-@]/.test(t)) t = "'" + t; // que Excel no lo tome como fórmula
+      return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+    };
+    const filas = [['Fecha de pago', 'Cliente', 'DNI', 'Plan actual', 'Duración', 'Monto', 'Método de pago', 'Período desde', 'Período hasta', 'Comprobante']];
+    state.data.pagos.slice()
+      .sort((a, b) => (a.fechaPago + a.id).localeCompare(b.fechaPago + b.id))
+      .forEach(p => {
+        const c = state.data.clientes.find(x => x.dni === p.dni);
+        const dur = DURACIONES.find(d => d.id === p.duracionId);
+        filas.push([
+          formatFecha(p.fechaPago), c ? c.nombre : '(cliente eliminado)', p.dni, c ? c.plan : '',
+          dur ? dur.label : (p.duracionId || ''), p.monto, p.metodoPago || '',
+          formatFecha(inicioPeriodo(p)), formatFecha(p.fechaVencimiento), p.comprobante || '',
+        ]);
+      });
+    const csv = '\uFEFF' + filas.map(f => f.map(celda).join(';')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'origo-pagos-' + isoDate(new Date()) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Descargando historial de pagos...');
+  }
+
+  // Lista de pagos de un cliente (se usa en Cuotas del administrador y en el perfil del cliente)
+  function filasHistorialPagos(pagos, conDeshacer) {
+    return pagos.map((p, i) => {
+      const dur = DURACIONES.find(d => d.id === p.duracionId);
+      return `
+        <div class="pago-fila">
+          <div>
+            <div class="p1">${formatFecha(p.fechaPago)} · ${dur ? dur.label : ''}</div>
+            <div class="p2">${esc(p.metodoPago || '')} · cubre del ${formatFechaCorta(inicioPeriodo(p))} al ${formatFechaCorta(p.fechaVencimiento)}${p.comprobante ? '<br>Comprobante: ' + esc(p.comprobante) : ''}${(conDeshacer && i === 0) ? `<br><button class="cancel-link" data-eliminar-pago="${p.id}">Deshacer este pago</button>` : ''}</div>
+          </div>
+          <span class="monto">${money(p.monto)}</span>
+        </div>`;
+    }).join('');
   }
 
   async function eliminarPago(pagoId) {
@@ -1485,12 +1660,33 @@
   function renderAdminCuotas(data) {
     const card = (c) => {
       const cuenta = cuotaDisplay(data, c.dni);
-      const infoVencimiento = cuenta.ultimo
-        ? `<div class="kv-row"><span class="k">${cuenta.estado === 'Vencido' ? 'Venció' : 'Vence'}</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${cuenta.diasRestantes!=null && cuenta.diasRestantes>=0 ? ' (' + cuenta.diasRestantes + (cuenta.diasRestantes===1?' día)':' días)') : ''}</span></div>
-           <div class="pago-detalle">Último pago: ${formatFechaCorta(cuenta.ultimo.fechaPago)} · ${DURACIONES.find(d=>d.id===cuenta.ultimo.duracionId)?.label || ''} · ${money(cuenta.ultimo.monto)} · ${cuenta.ultimo.metodoPago}
-             · <button class="cancel-link" data-eliminar-pago="${cuenta.ultimo.id}">Deshacer este pago</button>
-           </div>`
-        : `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
+      const pagos = pagosDe(data, c.dni);
+      const dias = (n) => ' (' + n + (n === 1 ? ' día)' : ' días)');
+
+      let infoVencimiento;
+      if (!cuenta.ultimo) {
+        infoVencimiento = `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
+      } else if (cuenta.estado === 'En período de pago') {
+        infoVencimiento = `
+          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          <div class="kv-row"><span class="k">Puede pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}${dias(cuenta.diasRestantes)}</span></div>`;
+      } else if (cuenta.estado === 'Vencido') {
+        infoVencimiento = `
+          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          <div class="kv-row"><span class="k">El plazo para pagar terminó</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
+      } else {
+        infoVencimiento = `<div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${dias(cuenta.diasRestantes)}</span></div>`;
+      }
+
+      const totalPagado = pagos.reduce((sum, p) => sum + (p.monto || 0), 0);
+      const historialHtml = pagos.length ? `
+          <details class="pago-hist">
+            <summary>Historial de pagos (${pagos.length})</summary>
+            ${filasHistorialPagos(pagos, true)}
+            <div class="pago-total"><span>Total pagado</span><span>${money(totalPagado)}</span></div>
+          </details>` : '';
+
+      const previo = periodoNuevoPago(data, c.dni, '1m');
 
       return `
         <div class="cuota-card">
@@ -1499,6 +1695,7 @@
             <span class="pill ${cuenta.pill}">${cuenta.label}</span>
           </div>
           ${infoVencimiento}
+          ${historialHtml}
           <div class="pago-registrar">
             <select class="duracion-select" data-duracion-dni="${c.dni}">
               ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label} — ${money(Math.round(c.precio*d.factor))}</option>`).join('')}
@@ -1507,6 +1704,8 @@
               ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
             </select>
           </div>
+          <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
+          <div class="pago-preview" data-preview-dni="${c.dni}">Este pago cubre del ${formatFechaCorta(isoDate(previo.base))} al ${formatFechaCorta(isoDate(previo.venc))}.</div>
           <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>
         </div>`;
     };
@@ -1528,10 +1727,20 @@
 
     const vencidos = urgentes.length;
 
+    // Cobrado en el mes en curso
+    const mesHoy = isoDate(new Date()).slice(0, 7);
+    const pagosMes = data.pagos.filter(p => p.fechaPago.slice(0, 7) === mesHoy);
+    const cobradoMes = pagosMes.reduce((sum, p) => sum + (p.monto || 0), 0);
+
     return `
         <p class="sub">Estado de cuentas${vencidos ? ' — ' + vencidos + ' necesitan atención' : ''}</p>
+        <div class="profile-card" style="margin-bottom:12px; padding:8px 16px;">
+          <div class="kv-row"><span class="k">Cobrado en ${MESES[new Date().getMonth()].toLowerCase()}</span><span class="v">${money(cobradoMes)}</span></div>
+          <div class="kv-row"><span class="k">Pagos registrados este mes</span><span class="v">${pagosMes.length}</span></div>
+        </div>
+        <button class="btn btn-ghost" id="exportPagosBtn" style="width:100%;">Descargar historial de pagos (Excel)</button>
         ${seccion('Necesitan atención', urgentes)}
-        ${seccion('Vencen esta semana', proximos)}
+        ${seccion('Por vencer o para pagar', proximos)}
         ${alDiaHtml}
     `;
   }
@@ -1664,9 +1873,14 @@
     if (cuenta.estado === 'Al día') {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-green">Al día</span></span></div>
                     <div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>`;
+    } else if (cuenta.estado === 'En período de pago') {
+      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-amber">Para pagar</span></span></div>
+                    <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+                    <div class="kv-row"><span class="k">Podés pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
+      cuotaBanner = `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Es momento de pagar la cuota</b>Venció el ${formatFechaCorta(cuenta.vencimiento)}. Tenés hasta el ${formatFechaCorta(cuenta.limite)} para pagarla.</div>`;
     } else if (cuenta.estado === 'Vencido') {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-red">Vencida</span></span></div>`;
-      cuotaBanner = `<div class="banner"><b>Cuota vencida</b>Tu cuota venció el ${formatFechaCorta(cuenta.vencimiento)}. Pasá por recepción para regularizarla.</div>`;
+      cuotaBanner = `<div class="banner"><b>Cuota vencida</b>Tu cuota venció el ${formatFechaCorta(cuenta.vencimiento)} y el plazo para pagarla terminó el ${formatFechaCorta(cuenta.limite)}. Pasá por recepción para regularizarla.</div>`;
     } else {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-amber">Sin pagos</span></span></div>`;
     }
@@ -1696,7 +1910,16 @@
           Escribinos por WhatsApp
         </a>
 
-        <details class="cuota-aldiacolapso">
+        ${(() => {
+          const misPagos = pagosDe(data, cliente.dni);
+          return misPagos.length ? `
+        <details class="cuota-aldiacolapso" style="margin-top:4px;">
+          <summary>Mis pagos (${misPagos.length})</summary>
+          <div>${filasHistorialPagos(misPagos, false)}</div>
+        </details>` : '';
+        })()}
+
+        <details class="cuota-aldiacolapso" style="margin-top:4px;">
           <summary>Cambiar mi contraseña</summary>
           <div class="cambiar-pass-form">
             <label>Contraseña actual<input type="password" id="passActual" autocomplete="off"></label>
@@ -2314,9 +2537,21 @@
             const dni = btn.dataset.registrarPago;
             const durSel = document.querySelector(`[data-duracion-dni="${dni}"]`);
             const metSel = document.querySelector(`[data-metodo-dni="${dni}"]`);
-            registrarNuevoPago(dni, durSel.value, metSel.value);
+            const notaInput = document.querySelector(`[data-comprobante-dni="${dni}"]`);
+            registrarNuevoPago(dni, durSel.value, metSel.value, notaInput ? notaInput.value : '');
           };
         });
+        // Al cambiar la duración se actualiza el período que cubriría el pago
+        root.querySelectorAll('[data-duracion-dni]').forEach(sel => {
+          sel.onchange = () => {
+            const dni = sel.dataset.duracionDni;
+            const previo = periodoNuevoPago(state.data, dni, sel.value);
+            const el = document.querySelector(`[data-preview-dni="${dni}"]`);
+            if (el) el.textContent = 'Este pago cubre del ' + formatFechaCorta(isoDate(previo.base)) + ' al ' + formatFechaCorta(isoDate(previo.venc)) + '.';
+          };
+        });
+        const exportBtn = document.getElementById('exportPagosBtn');
+        if (exportBtn) exportBtn.onclick = descargarPagosExcel;
         root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
           btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
         });
@@ -2330,6 +2565,8 @@
             guardarPrecioPlan(id, input.value);
           };
         });
+        const diasBtn = document.getElementById('guardarDiasParaPagarBtn');
+        if (diasBtn) diasBtn.onclick = () => guardarDiasParaPagar(document.getElementById('diasParaPagarInput').value);
         const matriculaBtn = document.getElementById('guardarMatriculaBtn');
         if (matriculaBtn) {
           matriculaBtn.onclick = () => {
