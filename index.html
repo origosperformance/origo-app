@@ -448,6 +448,59 @@
   .escala-fila .txt { color: var(--text-muted); }
   .escala-fila.active { background: var(--green); border-color: var(--green); }
   .escala-fila.active .txt { color: #F3F6F1; }
+  /* Caritas del wellness y números de color de TQR / RPE. El color de cada
+     opción llega en la variable --c como "r,g,b". */
+  .pro-card-head .flecha { flex: 0 0 auto; color: var(--text-muted); display: flex; transition: transform 0.15s ease; }
+  .pro-card-head .flecha svg { width: 18px; height: 18px; }
+  .pro-card-head[aria-expanded="true"] .flecha { transform: rotate(90deg); }
+  .pro-card-head .estado { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+  .pro-valor { display: inline-flex; align-items: center; gap: 7px; color: rgb(var(--c)); font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 22px; font-weight: 600; line-height: 1; }
+  .pro-valor small { font-size: 13px; font-weight: 500; opacity: 0.75; }
+  .pro-valor svg { width: 24px; height: 24px; }
+  .cara { stroke-width: 1.7; }
+  .caras { display: flex; gap: 6px; }
+  .cara-btn {
+    flex: 1; height: 54px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius);
+    color: rgb(var(--c)); opacity: 0.7; -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.12s ease, background 0.12s ease, transform 0.12s ease;
+  }
+  .cara-btn svg { width: 30px; height: 30px; }
+  .caras.elegida .cara-btn { opacity: 0.3; }
+  .caras .cara-btn.active { opacity: 1; background: rgba(var(--c), 0.2); border-color: rgb(var(--c)); transform: scale(1.06); }
+  .well-desc { color: var(--text-muted); }
+  .well-desc.elegida { color: rgb(var(--c)); font-weight: 600; }
+  .well-total { display: flex; align-items: center; gap: 14px; padding: 16px 0 6px; }
+  .well-total .cara-total { flex: 0 0 auto; color: var(--text-muted); }
+  .well-total .cara-total svg { width: 38px; height: 38px; }
+  .well-total.listo .cara-total { color: rgb(var(--c)); }
+  .well-total .datos { flex: 1; }
+  .well-total .fila { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--text-muted); }
+  .well-total .fila b { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 22px; font-weight: 600; color: var(--text); }
+  .well-total .barra { height: 6px; background: var(--surface-2); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+  .well-total .barra i { display: block; height: 100%; width: 0; background: var(--text-muted); border-radius: 3px; transition: width 0.2s ease; }
+  .well-total.listo .barra i { background: rgb(var(--c)); }
+  .eleccion { display: flex; align-items: center; gap: 14px; margin: 14px 0 12px; min-height: 52px; color: var(--text-muted); }
+  .eleccion .cara-total { flex: 0 0 auto; }
+  .eleccion .cara-total svg { width: 44px; height: 44px; }
+  .eleccion .num { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 40px; font-weight: 600; line-height: 1; min-width: 44px; }
+  .eleccion .txt { font-size: 14px; line-height: 1.35; }
+  .eleccion.listo { color: rgb(var(--c)); }
+  .eleccion.listo .txt { color: var(--text); }
+  .tiles { display: grid; gap: 6px; margin-bottom: 8px; }
+  .tiles-5 { grid-template-columns: repeat(5, 1fr); }
+  .tiles-6 { grid-template-columns: repeat(6, 1fr); }
+  @media (max-width: 350px) { .tiles-6 { grid-template-columns: repeat(4, 1fr); } }
+  .tile {
+    height: 50px; border-radius: var(--radius); cursor: pointer; padding: 0;
+    border: 1px solid rgba(var(--c), 0.5); background: rgba(var(--c), 0.13); color: rgb(var(--c));
+    font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 21px; font-weight: 600;
+    -webkit-tap-highlight-color: transparent; transition: background 0.12s ease, transform 0.12s ease;
+  }
+  .tile.active { background: rgb(var(--c)); color: #10161A; border-color: rgb(var(--c)); transform: scale(1.08); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgb(var(--c)); }
+  .tile:focus-visible, .cara-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  .pro-tabla td .color, .asis-stat .num.color { color: rgb(var(--c)); }
+  @media (prefers-reduced-motion: reduce) { .cara-btn, .tile, .pro-card-head .flecha, .well-total .barra i { transition: none; } }
   .pro-campos { display: grid; grid-template-columns: 104px 1fr; gap: 10px; margin-bottom: 14px; }
   .pro-campos label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); min-width: 0; }
   .pro-campos input {
@@ -789,6 +842,60 @@
 
   function esPro(cliente) { return !!cliente && cliente.plan === 'PRO'; }
 
+  // ---- Colores y caritas de las escalas PRO ----
+  // Cinco colores de "mal" a "bien". Los valores intermedios se mezclan.
+  const COLORES_ESCALA = [[225, 88, 79], [238, 138, 74], [242, 182, 59], [156, 203, 90], [63, 191, 127]];
+
+  // Color para una posición entre 0 (lo peor) y 1 (lo mejor), como "r,g,b"
+  function colorEscala(t) {
+    const x = Math.min(1, Math.max(0, t)) * (COLORES_ESCALA.length - 1);
+    const i = Math.min(COLORES_ESCALA.length - 2, Math.floor(x));
+    const f = x - i;
+    return COLORES_ESCALA[i].map((c, k) => Math.round(c + (COLORES_ESCALA[i + 1][k] - c) * f)).join(',');
+  }
+
+  // Posición (0 a 1, donde 1 es "bien") de un valor en cada escala. En RPE se
+  // invierte: un número alto no es mejor, es más esfuerzo.
+  function posicionPro(tipo, valor) {
+    if (tipo === 'wellness') return (valor - WELLNESS_ITEMS.length) / (WELLNESS_MAX - WELLNESS_ITEMS.length);
+    if (tipo === 'tqr') return (valor - 6) / 14;
+    if (tipo === 'rpe') return 1 - valor / 10;
+    return (valor - 1) / 4; // una pregunta del wellness, de 1 a 5
+  }
+  function colorPro(tipo, valor) { return colorEscala(posicionPro(tipo, valor)); }
+
+  // Carita de 1 (muy mal) a 5 (muy bien), con el mismo trazo que los demás íconos
+  const BOCAS = {
+    1: 'M8 16.8 Q12 12.6 16 16.8',
+    2: 'M8.4 16.1 Q12 14.1 15.6 16.1',
+    3: 'M8.6 15.4 H15.4',
+    4: 'M8.4 14.6 Q12 17.1 15.6 14.6',
+    5: 'M7.7 13.6 Q12 19.2 16.3 13.6 Z',
+  };
+  function cara(n) {
+    return `<svg class="ico cara" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.3"/><circle cx="8.8" cy="10" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="10" r="1.15" fill="currentColor" stroke="none"/><path d="${BOCAS[n] || BOCAS[3]}"/></svg>`;
+  }
+  function caraPro(tipo, valor) { return cara(1 + Math.round(posicionPro(tipo, valor) * 4)); }
+
+  // Texto de un valor de TQR o RPE. Los números que la escala no nombra se
+  // describen con sus vecinos ("Entre mala y razonable").
+  function etiquetaEscala(escala, valor) {
+    const exacta = escala.find(([n]) => n === valor);
+    if (exacta && exacta[1]) return exacta[1];
+    const corta = (t) => t.replace(/\s*recuperación\s*/i, ' ').trim().toLowerCase();
+    const antes = escala.filter(([n, t]) => n < valor && t).pop();
+    const despues = escala.find(([n, t]) => n > valor && t);
+    if (antes && despues) return 'Entre ' + corta(antes[1]) + ' y ' + corta(despues[1]);
+    if (despues) return 'Menos que ' + corta(despues[1]);
+    if (antes) return 'Más que ' + corta(antes[1]);
+    return '';
+  }
+
+  // Un valor ya cargado, pintado con su color (para tablas y resúmenes)
+  function valorColor(tipo, valor) {
+    return `<span class="color" style="--c:${colorPro(tipo, valor)}">${valor}</span>`;
+  }
+
   // Texto escrito por un cliente que se muestra en pantalla: siempre pasa por acá
   function esc(t) {
     return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -830,9 +937,9 @@
       const celda = v => (v === null || v === '') ? '<td class="vacio">–</td>' : `<td>${v}</td>`;
       filas.push(`<tr>
         <td>${DIAS_CORTO[d.getDay()]} ${d.getDate()}/${d.getMonth() + 1}</td>
-        ${celda(r.wellness ? r.wellness.valor : null)}
-        ${celda(r.tqr ? r.tqr.valor : null)}
-        ${celda(r.rpes.length ? r.rpes.map(x => x.valor).join(', ') : null)}
+        ${celda(r.wellness ? valorColor('wellness', r.wellness.valor) : null)}
+        ${celda(r.tqr ? valorColor('tqr', r.tqr.valor) : null)}
+        ${celda(r.rpes.length ? r.rpes.map(x => valorColor('rpe', x.valor)).join(', ') : null)}
         ${celda(r.carga)}
       </tr>`);
     }
@@ -1566,8 +1673,8 @@
         <div class="pro-admin-card">
           <button class="nombre-link pro-admin-nombre" data-ficha-dni="${c.dni}">${c.nombre}</button>
           <div class="asis-stats" style="margin-bottom:10px;">
-            <div class="asis-stat"><span class="num">${r.wellness ? r.wellness.valor : '–'}</span><span class="lbl">Wellness (de ${WELLNESS_MAX})</span></div>
-            <div class="asis-stat"><span class="num">${r.tqr ? r.tqr.valor : '–'}</span><span class="lbl">TQR (6 a 20)</span></div>
+            <div class="asis-stat"><span class="num ${r.wellness ? 'color' : ''}" ${r.wellness ? `style="--c:${colorPro('wellness', r.wellness.valor)}"` : ''}>${r.wellness ? r.wellness.valor : '–'}</span><span class="lbl">Wellness (de ${WELLNESS_MAX})</span></div>
+            <div class="asis-stat"><span class="num ${r.tqr ? 'color' : ''}" ${r.tqr ? `style="--c:${colorPro('tqr', r.tqr.valor)}"` : ''}>${r.tqr ? r.tqr.valor : '–'}</span><span class="lbl">TQR (6 a 20)</span></div>
             <div class="asis-stat"><span class="num">${r.carga !== null ? r.carga : (r.rpes.length ? r.rpes.map(x => x.valor).join(', ') : '–')}</span><span class="lbl">${r.carga !== null ? 'Carga del día' : 'RPE (0 a 10)'}</span></div>
           </div>
           ${wellDetalle}
@@ -3098,13 +3205,17 @@
   }
 
   // ---------------- Render: Mi día (solo PRO) ----------------
-  function renderEscala(tipo, escala, seleccionado) {
+  // Grilla de números de color para TQR y RPE, con el valor elegido en grande arriba
+  function renderEscala(tipo, escala, seleccionado, columnas) {
+    const elegido = seleccionado !== undefined && seleccionado !== null;
     return `
-      <div class="escala" data-escala="${tipo}">
-        ${escala.map(([n, txt]) => `
-          <button class="escala-fila ${seleccionado === n ? 'active' : ''}" data-val="${n}">
-            <span class="n">${n}</span><span class="txt">${txt}</span>
-          </button>`).join('')}
+      <div class="eleccion ${elegido ? 'listo' : ''}" id="eleccion-${tipo}" ${elegido ? `style="--c:${colorPro(tipo, seleccionado)}"` : ''}>
+        <span class="cara-total">${elegido ? caraPro(tipo, seleccionado) : cara(3)}</span>
+        <span class="num">${elegido ? seleccionado : '–'}</span>
+        <span class="txt">${elegido ? etiquetaEscala(escala, seleccionado) : 'Tocá un número'}</span>
+      </div>
+      <div class="tiles tiles-${columnas}" data-escala="${tipo}">
+        ${escala.map(([n]) => `<button class="tile ${seleccionado === n ? 'active' : ''}" data-val="${n}" style="--c:${colorPro(tipo, n)}" aria-label="${n}: ${etiquetaEscala(escala, n)}">${n}</button>`).join('')}
       </div>`;
   }
 
@@ -3121,32 +3232,35 @@
     }
 
     const r = resumenDiaPro(data, cliente.dni, hoy);
-    // Si el cliente todavía no tocó nada, se abre sola la primera tarjeta pendiente
-    const abierto = state.proAbierto === undefined
-      ? (!r.wellness ? 'wellness' : (!r.tqr ? 'tqr' : null))
-      : state.proAbierto;
+    // Al entrar, las tres tarjetas arrancan cerradas: se abre la que el cliente toque
+    const abierto = state.proAbierto || null;
     const draft = state.proDraft;
     const pendiente = '<span class="pill pill-amber">Pendiente</span>';
 
-    // --- Wellness ---
+    // --- Wellness: una carita por pregunta ---
     const dw = draft.wellness || {};
     const totalDraft = WELLNESS_ITEMS.reduce((sum, i) => sum + (dw[i.id] || 0), 0);
     const completo = WELLNESS_ITEMS.every(i => dw[i.id]);
     const wellnessBody = abierto !== 'wellness' ? '' : `
       <div class="pro-card-body">
-        <p class="pro-ayuda">Marcá cómo te sentís hoy, antes de entrenar. En cada pregunta 1 es lo peor y 5 lo mejor.</p>
+        <p class="pro-ayuda">¿Cómo llegás hoy? Tocá una carita en cada una.</p>
         ${WELLNESS_ITEMS.map(i => `
           <div class="well-item" data-well-item="${i.id}">
             <div class="well-top">
               <span class="well-label">${i.label}</span>
-              <span class="well-desc">${dw[i.id] ? i.ref[dw[i.id]] : ''}</span>
+              <span class="well-desc ${dw[i.id] ? 'elegida' : ''}" ${dw[i.id] ? `style="--c:${colorPro('item', dw[i.id])}"` : ''}>${dw[i.id] ? i.ref[dw[i.id]] : ''}</span>
             </div>
-            <div class="well-opts">
-              ${[1,2,3,4,5].map(n => `<button class="well-opt ${dw[i.id] === n ? 'active' : ''}" data-val="${n}">${n}</button>`).join('')}
+            <div class="caras ${dw[i.id] ? 'elegida' : ''}">
+              ${[1,2,3,4,5].map(nn => `<button class="cara-btn ${dw[i.id] === nn ? 'active' : ''}" data-val="${nn}" style="--c:${colorPro('item', nn)}" aria-label="${i.label}: ${i.ref[nn]}">${cara(nn)}</button>`).join('')}
             </div>
-            <div class="well-anchors"><span>1 · ${i.ref[1]}</span><span>5 · ${i.ref[5]}</span></div>
           </div>`).join('')}
-        <div class="kv-row" style="padding-top:14px;"><span class="k">Total</span><span class="v" id="wellTotal">${completo ? totalDraft + ' de ' + WELLNESS_MAX : '– de ' + WELLNESS_MAX}</span></div>
+        <div class="well-total ${completo ? 'listo' : ''}" id="wellTotalCaja" ${completo ? `style="--c:${colorPro('wellness', totalDraft)}"` : ''}>
+          <span class="cara-total" id="wellTotalCara">${completo ? caraPro('wellness', totalDraft) : cara(3)}</span>
+          <div class="datos">
+            <div class="fila"><span>Tu wellness de hoy</span><span><b id="wellTotal">${completo ? totalDraft : '–'}</b> de ${WELLNESS_MAX}</span></div>
+            <div class="barra"><i id="wellTotalBarra" style="width:${completo ? Math.round(totalDraft / WELLNESS_MAX * 100) : 0}%"></i></div>
+          </div>
+        </div>
         <div class="error-text" id="proError"></div>
         <button class="btn btn-primary" id="guardarWellnessBtn" style="width:100%; margin-top:6px;">Guardar wellness</button>
       </div>`;
@@ -3154,10 +3268,11 @@
     // --- TQR ---
     const tqrBody = abierto !== 'tqr' ? '' : `
       <div class="pro-card-body">
-        <p class="pro-ayuda">¿Qué tan recuperado te sentís desde tu último entrenamiento? Elegí el número que mejor te describe.</p>
-        ${renderEscala('tqr', TQR_ESCALA, draft.tqr)}
+        <p class="pro-ayuda">¿Qué tan recuperado te sentís desde tu último entrenamiento?</p>
+        ${renderEscala('tqr', TQR_ESCALA, draft.tqr, 5)}
+        <div class="well-anchors"><span>6 es lo peor</span><span>20 es lo mejor</span></div>
         <div class="error-text" id="proError"></div>
-        <button class="btn btn-primary" id="guardarTqrBtn" style="width:100%; margin-top:6px;">Guardar TQR</button>
+        <button class="btn btn-primary" id="guardarTqrBtn" style="width:100%; margin-top:10px;">Guardar TQR</button>
       </div>`;
 
     // --- RPE ---
@@ -3166,7 +3281,7 @@
       return `
         <div class="pro-sesion">
           <div>
-            <div class="s1">RPE ${x.valor}</div>
+            <div class="s1">RPE ${valorColor('rpe', x.valor)} <span style="font-weight:400; color:var(--text-muted);">${etiquetaEscala(RPE_ESCALA, x.valor).toLowerCase()}</span></div>
             ${extra ? `<div class="s2">${extra}</div>` : ''}
           </div>
           <button class="cancel-link" data-del-registro="${x.id}">Borrar</button>
@@ -3175,8 +3290,9 @@
     const rpeBody = abierto !== 'rpe' ? '' : `
       <div class="pro-card-body">
         ${sesionesHtml}
-        <p class="pro-ayuda">¿Qué tan duro fue el entrenamiento en general? Cargá una sesión por cada entrenamiento del día, también los que hacés fuera de ORIGO.</p>
-        ${renderEscala('rpe', RPE_ESCALA, draft.rpe)}
+        <p class="pro-ayuda">¿Qué tan duro fue el entrenamiento? Cargá una sesión por cada entrenamiento del día, también los de afuera de ORIGO.</p>
+        ${renderEscala('rpe', RPE_ESCALA, draft.rpe, 6)}
+        <div class="well-anchors" style="margin-bottom:14px;"><span>0 es reposo</span><span>10 es el máximo</span></div>
         <div class="pro-campos">
           <label>Duración (min)<input type="text" inputmode="numeric" id="rpeMinutos" placeholder="Ej: 60" autocomplete="off"></label>
           <label>¿Qué hiciste?<input type="text" id="rpeActividad" maxlength="60" placeholder="Ej: entrenamiento con el club" autocomplete="off"></label>
@@ -3189,7 +3305,7 @@
       <div class="pro-card">
         <button class="pro-card-head" data-pro-toggle="${tipo}" aria-expanded="${abierto === tipo}">
           <div><div class="t">${tit}</div><div class="d">${desc}</div></div>
-          ${estadoHtml}
+          <span class="estado">${estadoHtml}<span class="flecha">${ICONOS.der}</span></span>
         </button>
         ${body}
       </div>`;
@@ -3198,12 +3314,12 @@
       <div class="view">
         ${titulo}
         <div class="pro-seccion">Antes de entrenar</div>
-        ${card('wellness', 'Wellness', 'Cómo llegás hoy: fatiga, sueño, dolor, estrés y ánimo',
-            r.wellness ? `<span class="pill pill-green">${r.wellness.valor} de ${WELLNESS_MAX}</span>` : pendiente, wellnessBody)}
-        ${card('tqr', 'TQR', 'Calidad de tu recuperación, de 6 a 20',
-            r.tqr ? `<span class="pill pill-green">${r.tqr.valor}</span>` : pendiente, tqrBody)}
+        ${card('wellness', 'Wellness', 'Cómo llegás hoy',
+            r.wellness ? `<span class="pro-valor" style="--c:${colorPro('wellness', r.wellness.valor)}">${caraPro('wellness', r.wellness.valor)}${r.wellness.valor}<small>/${WELLNESS_MAX}</small></span>` : pendiente, wellnessBody)}
+        ${card('tqr', 'TQR', 'Qué tan recuperado estás',
+            r.tqr ? `<span class="pro-valor" style="--c:${colorPro('tqr', r.tqr.valor)}">${caraPro('tqr', r.tqr.valor)}${r.tqr.valor}</span>` : pendiente, tqrBody)}
         <div class="pro-seccion">Después de entrenar</div>
-        ${card('rpe', 'RPE', 'Esfuerzo percibido de la sesión, de 0 a 10',
+        ${card('rpe', 'RPE', 'Qué tan duro fue el entrenamiento',
             r.rpes.length ? `<span class="pill pill-green">${r.rpes.length} ${r.rpes.length === 1 ? 'sesión' : 'sesiones'}</span>` : pendiente, rpeBody)}
         <div class="pro-seccion">Tus últimos 7 días</div>
         <div class="pro-card" style="padding:14px 14px 6px;">${tablaUltimosDiasPro(data, cliente.dni, hoy)}</div>
@@ -3215,9 +3331,7 @@
   function toggleCardPro(tipo) {
     const hoy = isoDate(new Date());
     const r = resumenDiaPro(state.data, state.cliente.dni, hoy);
-    const abiertoAhora = state.proAbierto === undefined
-      ? (!r.wellness ? 'wellness' : (!r.tqr ? 'tqr' : null))
-      : state.proAbierto;
+    const abiertoAhora = state.proAbierto || null;
     if (abiertoAhora === tipo) { state.proAbierto = null; renderApp(); return; }
     state.proAbierto = tipo;
     state.proDraft = {};
@@ -3255,7 +3369,8 @@
     const total = WELLNESS_ITEMS.reduce((sum, i) => sum + d[i.id], 0);
     if (!(await guardarRegistroPro('wellness', total, detalle, true))) return;
     state.proDraft = {};
-    state.proAbierto = undefined; // pasa sola a la siguiente pendiente
+    // Para seguir de corrido: si falta el TQR, se abre esa tarjeta
+    state.proAbierto = resumenDiaPro(state.data, state.cliente.dni, isoDate(new Date())).tqr ? null : 'tqr';
     showToast('Wellness guardado');
     renderApp();
     window.scrollTo(0, 0);
@@ -3823,26 +3938,47 @@
       // vuelve a dibujar la pantalla, así no salta el scroll mientras se completa.
       root.querySelectorAll('[data-well-item]').forEach(item => {
         const def = WELLNESS_ITEMS.find(i => i.id === item.dataset.wellItem);
-        item.querySelectorAll('.well-opt').forEach(btn => {
+        item.querySelectorAll('.cara-btn').forEach(btn => {
           btn.onclick = () => {
             const n = parseInt(btn.dataset.val, 10);
             state.proDraft.wellness = state.proDraft.wellness || {};
             state.proDraft.wellness[def.id] = n;
-            item.querySelectorAll('.well-opt').forEach(b => b.classList.toggle('active', b === btn));
-            item.querySelector('.well-desc').textContent = def.ref[n];
+            item.querySelectorAll('.cara-btn').forEach(b => b.classList.toggle('active', b === btn));
+            item.querySelector('.caras').classList.add('elegida');
+            const desc = item.querySelector('.well-desc');
+            desc.textContent = def.ref[n];
+            desc.classList.add('elegida');
+            desc.style.setProperty('--c', colorPro('item', n));
+            // Total del día: se pinta cuando están las cinco respuestas
             const d = state.proDraft.wellness;
             const listo = WELLNESS_ITEMS.every(i => d[i.id]);
             const total = WELLNESS_ITEMS.reduce((sum, i) => sum + (d[i.id] || 0), 0);
-            document.getElementById('wellTotal').textContent = (listo ? total : '–') + ' de ' + WELLNESS_MAX;
+            const caja = document.getElementById('wellTotalCaja');
+            document.getElementById('wellTotal').textContent = listo ? total : '–';
+            document.getElementById('wellTotalBarra').style.width = (listo ? Math.round(total / WELLNESS_MAX * 100) : 0) + '%';
+            caja.classList.toggle('listo', listo);
+            if (listo) {
+              caja.style.setProperty('--c', colorPro('wellness', total));
+              document.getElementById('wellTotalCara').innerHTML = caraPro('wellness', total);
+            }
             mostrarErrorPro('');
           };
         });
       });
       root.querySelectorAll('[data-escala]').forEach(grupo => {
-        grupo.querySelectorAll('.escala-fila').forEach(btn => {
+        const tipo = grupo.dataset.escala;
+        const escala = tipo === 'tqr' ? TQR_ESCALA : RPE_ESCALA;
+        grupo.querySelectorAll('.tile').forEach(btn => {
           btn.onclick = () => {
-            state.proDraft[grupo.dataset.escala] = parseInt(btn.dataset.val, 10);
-            grupo.querySelectorAll('.escala-fila').forEach(b => b.classList.toggle('active', b === btn));
+            const n = parseInt(btn.dataset.val, 10);
+            state.proDraft[tipo] = n;
+            grupo.querySelectorAll('.tile').forEach(b => b.classList.toggle('active', b === btn));
+            const el = document.getElementById('eleccion-' + tipo);
+            el.classList.add('listo');
+            el.style.setProperty('--c', colorPro(tipo, n));
+            el.querySelector('.cara-total').innerHTML = caraPro(tipo, n);
+            el.querySelector('.num').textContent = n;
+            el.querySelector('.txt').textContent = etiquetaEscala(escala, n);
             mostrarErrorPro('');
           };
         });
