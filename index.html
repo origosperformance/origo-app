@@ -796,6 +796,10 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_L4D-Q3B6IzbuiQSvunwWiA_3MUlzrVa';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // Versión de la app: se muestra al pie de administración para saber qué
+  // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
+  const VERSION_APP = '7/10/2026 · 21';
+
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
   // Minutos de tolerancia después de la hora de inicio durante los que un turno
@@ -1144,6 +1148,36 @@
     await refreshData();
     showToast(activar ? 'La matrícula se vuelve a cobrar' : 'La matrícula dejó de cobrarse');
     renderApp();
+  }
+
+  // ---------------- Cuota especial ----------------
+  // Un cliente puede pagar una cuota distinta a la de su plan (una excepción).
+  // Se carga en Clientes > ficha > Editar y se guarda en "config" como
+  // 'cuota_<dni>' con el monto mensual. Mientras exista, esa es su cuota aunque
+  // se edite al cliente o cambien los precios de los planes.
+  const CLAVE_CUOTA = 'cuota_';
+  function cuotaEspecialDe(dni) {
+    const fila = state.data && state.data.config ? state.data.config.find(c => c.clave === CLAVE_CUOTA + dni) : null;
+    const v = fila ? Number(fila.valor) : 0;
+    return v > 0 ? v : null;
+  }
+
+  // Guarda (monto) o quita (null) la cuota especial de un cliente. Devuelve false si falló.
+  async function guardarCuotaEspecial(dni, monto) {
+    if ((monto || null) === cuotaEspecialDe(dni)) return true;
+    const clave = CLAVE_CUOTA + dni;
+    const existe = state.data.config.some(c => c.clave === clave);
+    let res;
+    if (monto) {
+      res = existe
+        ? await sb.from('config').update({ valor: monto }).eq('clave', clave)
+        : await sb.from('config').insert({ clave, valor: monto });
+    } else {
+      res = await sb.from('config').update({ valor: 0 }).eq('clave', clave);
+      if (!res.error) await sb.from('config').delete().eq('clave', clave);
+    }
+    if (res.error) { console.error('No se pudo guardar la cuota especial:', res.error); return false; }
+    return true;
   }
 
   // ---------------- Usuario de prueba ----------------
@@ -1624,6 +1658,7 @@
         ${renderAdminTabs(state.adminTab)}
         ${body}
         <button class="link-btn" id="backToLoginBtn2" style="margin-top:24px;">← Salir de administración</button>
+        <div class="pago-detalle" id="versionApp" style="margin-top:16px;">Versión ${VERSION_APP}</div>
       </div>
     `;
   }
@@ -1908,6 +1943,10 @@
               <input type="number" id="fLimiteSemanal" min="0" max="20" placeholder="Vacío = automático según estímulos contratados"
                 value="${editing&&editing.limiteSemanalOverride!=null?editing.limiteSemanalOverride:''}">
             </label>
+            <label class="span2">Cuota especial por mes (excepción)
+              <input type="text" inputmode="numeric" id="fCuotaEspecial" placeholder="Vacío = el precio de su plan" autocomplete="off"
+                value="${editing && cuotaEspecialDe(editing.dni) ? cuotaEspecialDe(editing.dni) : ''}">
+            </label>
             <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
               <input type="checkbox" id="fPrueba" style="width:auto;" ${editing&&esPrueba(editing.dni)?'checked':''}>
               Usuario de prueba (para mostrar la app: nunca figura con deuda ni cuenta en los números)
@@ -2163,6 +2202,7 @@
           </div>
           ${ctx.prueba ? `<div class="pago-detalle" style="margin-bottom:6px;">Usuario de prueba: no figura en Cuotas ni suma en lo cobrado.</div>` : ''}
           <div class="kv-row"><span class="k">Plan</span><span class="v">${esc(c.plan)} · ${money(c.precio || 0)} / mes</span></div>
+          ${cuotaEspecialDe(c.dni) ? `<div class="kv-row"><span class="k">Cuota especial</span><span class="v" style="color:var(--amber);">El plan vale ${money(precioDe(c.plan, c.dias) || 0)}</span></div>` : ''}
           ${infoVencimientoHtml(ctx.cuenta)}
           ${ultimoPago ? `<div class="kv-row"><span class="k">Último pago</span><span class="v">${formatFecha(ultimoPago.fechaPago)} · ${money(ultimoPago.monto || 0)}</span></div>` : ''}
           ${matriculaHtml}
@@ -4152,12 +4192,17 @@
     const planSel = document.getElementById('fPlan');
     const diasSel = document.getElementById('fDias');
     const preview = document.getElementById('fPrecioPreview');
+    const especialInput = document.getElementById('fCuotaEspecial');
     const updatePreview = () => {
       const esPro = planSel.value === 'PRO';
       diasSel.disabled = esPro;
       const dias = esPro ? null : parseInt(diasSel.value, 10);
-      const precio = precioDe(planSel.value, dias);
-      preview.textContent = precio ? money(precio) + ' / mes' : 'Combinación no válida';
+      const precioPlan = precioDe(planSel.value, dias);
+      const especial = parseInt(String(especialInput ? especialInput.value : '').replace(/[^\d]/g, ''), 10) || 0;
+      const precio = especial > 0 ? especial : precioPlan;
+      preview.textContent = especial > 0
+        ? money(especial) + ' / mes · especial' + (precioPlan ? ' (el plan vale ' + money(precioPlan) + ')' : '')
+        : (precioPlan ? money(precioPlan) + ' / mes' : 'Combinación no válida');
       // Monto y período del pago inicial (solo en el alta)
       const durSel = document.getElementById('fDuracionPago');
       const montoEl = document.getElementById('fPagoInicialMonto');
@@ -4178,6 +4223,7 @@
     diasSel.onchange = updatePreview;
     const durPagoSel = document.getElementById('fDuracionPago');
     if (durPagoSel) durPagoSel.onchange = updatePreview;
+    if (especialInput) especialInput.oninput = updatePreview;
     updatePreview();
     document.getElementById('addClienteBtn').onclick = onAddCliente;
   }
@@ -4212,7 +4258,19 @@
       return;
     }
 
-    const precio = precioDe(plan, dias);
+    // Cuota: la especial si se cargó una, si no la del plan
+    const especialTexto = document.getElementById('fCuotaEspecial').value.trim();
+    const cuotaEspecial = especialTexto === '' ? null : parseInt(especialTexto.replace(/[.\s$]/g, ''), 10);
+    if (especialTexto !== '' && (!/^[\d.\s$]+$/.test(especialTexto) || !(cuotaEspecial > 0))) {
+      state.adminFormError = 'La cuota especial tiene que ser un monto en pesos (por ejemplo 100000), o quedar vacía.';
+      state.adminFormNotice = '';
+      renderApp();
+      return;
+    }
+    const precio = cuotaEspecial || precioDe(plan, dias);
+    const notaCuota = (ok, antes) => !ok ? ' Ojo: no se pudo guardar la cuota especial, probá de nuevo.'
+      : (cuotaEspecial && cuotaEspecial !== antes) ? ` Cuota especial: ${money(cuotaEspecial)} por mes.`
+      : (!cuotaEspecial && antes) ? ' Volvió a la cuota de su plan.' : '';
     const datosComunes = {
       nombre, email, telefono, plan, precio,
       dias: esPro ? null : dias,
@@ -4231,13 +4289,16 @@
       if (error) { state.adminFormError = 'No se pudo guardar (' + error.message + ')'; renderApp(); return; }
       const dniEditado = state.editingDni;
       const eraPrueba = esPrueba(dniEditado);
+      const cuotaAntes = cuotaEspecialDe(dniEditado);
       await guardarMarcaPrueba(dniEditado, marcarPrueba);
+      await guardarCuotaEspecial(dniEditado, cuotaEspecial);
       await refreshData();
       // Se confirma contra lo que realmente quedó guardado en la base
       const okMarca = esPrueba(dniEditado) === marcarPrueba;
       state.adminFormError = '';
       state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}${
-        !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}`;
+        !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}${
+        notaCuota(cuotaEspecialDe(dniEditado) === cuotaEspecial, cuotaAntes)}`;
       renderApp();
       return;
     }
@@ -4283,10 +4344,12 @@
     }
 
     if (marcarPrueba) await guardarMarcaPrueba(dni, true);
+    if (cuotaEspecial) await guardarCuotaEspecial(dni, cuotaEspecial);
     await refreshData();
     state.adminFormError = '';
     state.nuevoClienteAbierto = false;
-    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}`;
+    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}${
+      cuotaEspecial ? notaCuota(cuotaEspecialDe(dni) === cuotaEspecial, null) : ''}`;
     renderApp();
   }
 
@@ -4325,7 +4388,11 @@
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
     // Sus registros de control diario se borran con él (si la tabla existe)
     if (state.data.registrosProListo) await sb.from('registros_pro').delete().eq('dni', dni);
-    // Y su marca de usuario de prueba, para que no la herede otro cliente con el mismo DNI
+    // Y su cuota especial y su marca de usuario de prueba, para que no las herede otro cliente con el mismo DNI
+    if (state.data.config.some(c => c.clave === CLAVE_CUOTA + dni)) {
+      await sb.from('config').update({ valor: 0 }).eq('clave', CLAVE_CUOTA + dni);
+      await sb.from('config').delete().eq('clave', CLAVE_CUOTA + dni);
+    }
     if (state.data.config.some(c => c.clave === CLAVE_PRUEBA + dni)) {
       await sb.from('config').update({ valor: 0 }).eq('clave', CLAVE_PRUEBA + dni);
       await sb.from('config').delete().eq('clave', CLAVE_PRUEBA + dni);
