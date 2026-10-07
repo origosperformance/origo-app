@@ -13,7 +13,8 @@
 <meta name="apple-mobile-web-app-title" content="ORIGO">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://fvimyumzqvbzjzhpdhme.supabase.co">
 <style>
   :root {
     --bg: #10161A;
@@ -596,9 +597,20 @@
     position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(10px);
     background: var(--surface-2); border: 1px solid var(--green); color: var(--text);
     padding: 10px 18px; border-radius: var(--radius); font-size: 13px; opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none; white-space: nowrap;
-    max-width: 90%; text-overflow: ellipsis; overflow: hidden;
+    transition: opacity 0.2s ease, transform 0.2s ease; pointer-events: none;
+    width: max-content; max-width: min(90%, 420px); text-align: center; line-height: 1.4; z-index: 30;
   }
+  /* Pantalla de carga inicial */
+  .cargando { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 13px; }
+  .cargando b { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: 3px; color: var(--text); }
+  .cargando i { width: 120px; height: 3px; border-radius: 2px; background: var(--surface-2); overflow: hidden; position: relative; margin-top: 6px; }
+  .cargando i::after, body.ocupado::before { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: var(--green); animation: corre 1s ease-in-out infinite; }
+  @keyframes corre { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+  /* Línea fina arriba mientras se guarda algo (aparece si tarda más de un instante) */
+  body.ocupado::before { position: fixed; top: 0; bottom: auto; height: 3px; z-index: 60; opacity: 0; animation: corre 1s ease-in-out infinite, aparece 0.01s linear 0.25s forwards; }
+  @keyframes aparece { to { opacity: 1; } }
+  body.ocupado .btn, body.ocupado .slot-btn, body.ocupado .asist-btn, body.ocupado .turno-barra .btn { opacity: 0.55; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .cargando i::after, body.ocupado::before { animation: aparece 0.01s linear 0.25s forwards; width: 100%; } }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   /* ---------- Turnos: semana y horarios en grilla ---------- */
@@ -787,18 +799,30 @@
 </head>
 <body>
 
-<div id="root"></div>
+<div id="root"><div class="cargando"><b>ORIGO</b><span>Cargando…</span><i></i></div></div>
 <div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
 (function () {
   const SUPABASE_URL = 'https://fvimyumzqvbzjzhpdhme.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_L4D-Q3B6IzbuiQSvunwWiA_3MUlzrVa';
+  // Si la librería de Supabase no llegó a descargarse (sin internet, o la
+  // red la bloqueó), se avisa en vez de dejar la pantalla vacía.
+  if (!window.supabase) {
+    document.getElementById('root').innerHTML = `
+      <div class="login-screen">
+        <div class="banner"><b>No se pudo abrir ORIGO</b>Revisá tu conexión a internet y volvé a intentar.</div>
+        <button class="btn btn-primary" onclick="location.reload()">Reintentar</button>
+      </div>`;
+    return;
+  }
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '7/10/2026 · 21';
+  const VERSION_APP = '7/10/2026 · 22';
 
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
@@ -1162,6 +1186,16 @@
     return v > 0 ? v : null;
   }
 
+  // Cuota especial que rige de hecho: la cargada como excepción o, si no hay,
+  // la que el cliente tiene guardada cuando no coincide con el precio de su
+  // plan (por ejemplo, si alguna vez se la cambiaron a mano en la base).
+  function cuotaEspecialEfectiva(c) {
+    const cargada = cuotaEspecialDe(c.dni);
+    if (cargada) return cargada;
+    const delPlan = precioDe(c.plan, c.dias);
+    return (c.precio && c.precio !== delPlan) ? c.precio : null;
+  }
+
   // Guarda (monto) o quita (null) la cuota especial de un cliente. Devuelve false si falló.
   async function guardarCuotaEspecial(dni, monto) {
     if ((monto || null) === cuotaEspecialDe(dni)) return true;
@@ -1245,6 +1279,8 @@
     asistenciasFecha: null,
     clienteBusqueda: '',
     confirmarEliminarDni: null, // cliente al que se le está preguntando "¿eliminar?"
+    errorConexion: false,    // la última lectura de la base falló
+    loginDni: null,          // DNI escrito en la pantalla de ingreso (para no perderlo si la clave está mal)
     slotElegido: null,       // horario tocado en Turnos, a la espera de confirmar
     turnosVista: 'dia',      // administración, pestaña Turnos: dia | semana
     anotarEn: null,          // hora en la que está abierto el buscador "+ Anotar"
@@ -1258,6 +1294,15 @@
     proDraft: {},            // lo que el cliente va eligiendo antes de guardar
     proFecha: null,          // fecha que mira el administrador en la pestaña Pro
   };
+
+  // La app trabaja siempre con la fecha y la hora de Argentina (UTC-3, sin
+  // horario de verano), aunque el celular esté configurado en otro país. Así
+  // "hoy" y "ese turno ya empezó" valen lo mismo para todos.
+  const HUSO_GIMNASIO_MIN = 180; // minutos al oeste de UTC
+  function ahora() {
+    const real = new Date();
+    return new Date(real.getTime() + (real.getTimezoneOffset() - HUSO_GIMNASIO_MIN) * 60000);
+  }
 
   function isoDate(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -1287,7 +1332,7 @@
   // true si el turno ya empezó (más la tolerancia): desde ahí no se puede
   // reservar ni cancelar, y pasa a contar como asistencia.
   function turnoYaEmpezo(fechaIso, hora) {
-    return Date.now() >= turnoInicio(fechaIso, hora).getTime() + MINUTOS_GRACIA_TURNO * 60000;
+    return ahora().getTime() >= turnoInicio(fechaIso, hora).getTime() + MINUTOS_GRACIA_TURNO * 60000;
   }
 
   // Estado "real" de una reserva para mostrar y contar:
@@ -1323,7 +1368,7 @@
   }
 
   function todayMidnight() {
-    const t = new Date();
+    const t = ahora();
     t.setHours(0, 0, 0, 0);
     return t;
   }
@@ -1370,6 +1415,17 @@
   function momentoDeId(id) {
     const m = /^r(\d{13})/.exec(String(id || ''));
     return m ? parseInt(m[1], 10) : null;
+  }
+
+  function reservaDbToJs(r) {
+    return {
+      id: r.id, dni: r.dni, fecha: r.fecha, hora: r.hora, estado: r.estado,
+      // Momento en que se hizo la reserva: lo guarda la base (creado_en) o, si
+      // todavía no existe esa columna, sale del número que lleva el id.
+      creadoEn: (r.creado_en ? Date.parse(r.creado_en) : momentoDeId(r.id)) || null,
+      canceladoEn: r.cancelado_en ? Date.parse(r.cancelado_en) : null,
+      porAdmin: !!r.por_admin,
+    };
   }
 
   // Cancela una reserva dejando anotado cuándo (si la base ya tiene esa columna)
@@ -1452,25 +1508,57 @@
     return pedido;
   }
 
+  // Lee una tabla entera. Supabase entrega como mucho 1000 filas por pedido,
+  // así que se pide por páginas hasta tener todas (si no, al pasar las 1000
+  // reservas empezarían a "desaparecer" turnos y asistencias).
+  const FILAS_POR_PEDIDO = 1000;
+  async function leerTabla(tabla, columnaOrden) {
+    let filas = [];
+    for (let vuelta = 0; vuelta < 200; vuelta++) {
+      let res;
+      try {
+        res = await sb.from(tabla).select('*', { count: 'exact' }).order(columnaOrden).range(filas.length, filas.length + FILAS_POR_PEDIDO - 1);
+      } catch (e) {
+        return { data: null, error: { message: (e && e.message) || 'sin conexión' } };
+      }
+      if (res.error) {
+        // Pedir una página que ya no existe no es un error: ahí se terminó la tabla
+        if (filas.length > 0 && (res.status === 416 || res.error.code === 'PGRST103')) break;
+        // Si la lectura por páginas no anduvo de entrada, se intenta la lectura simple de siempre
+        if (vuelta === 0) {
+          try { const simple = await sb.from(tabla).select('*'); if (!simple.error && simple.data) return { data: simple.data, error: null }; } catch (e) {}
+        }
+        return { data: null, error: res.error };
+      }
+      const pagina = res.data || [];
+      filas = filas.concat(pagina);
+      const total = typeof res.count === 'number' ? res.count : null;
+      if (pagina.length === 0 || (total !== null ? filas.length >= total : pagina.length < FILAS_POR_PEDIDO)) break;
+    }
+    return { data: filas, error: null };
+  }
+
   async function leerBase(turno, silencioso) {
     const [clientesRes, reservasRes, pagosRes, rutinasRes, planesRes, configRes, registrosProRes] = await Promise.all([
-      sb.from('clientes').select('*'),
-      sb.from('reservas').select('*'),
-      sb.from('pagos').select('*'),
-      sb.from('rutinas').select('*'),
-      sb.from('planes').select('*'),
-      sb.from('config').select('*'),
-      sb.from('registros_pro').select('*'),
+      leerTabla('clientes', 'dni'),
+      leerTabla('reservas', 'id'),
+      leerTabla('pagos', 'id'),
+      leerTabla('rutinas', 'id'),
+      leerTabla('planes', 'id'),
+      leerTabla('config', 'clave'),
+      leerTabla('registros_pro', 'id'),
     ]);
     if (turno !== refreshTurno) return; // ya salió una lectura más nueva
 
     if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error) {
       const primerError = clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error;
       console.error('Error leyendo Supabase:', primerError.message || primerError);
-      if (!silencioso) showToast('Error de base de datos: ' + (primerError.message || 'desconocido'));
-      state.data = state.data || { clientes: [], reservas: [], pagos: [], planes: [], config: [] };
+      if (!silencioso) showToast('No se pudo conectar con ORIGO. Revisá tu conexión.');
+      state.errorConexion = true;
+      state.data = state.data || { clientes: [], reservas: [], pagos: [], planes: [], config: [], registrosPro: [], registrosProListo: false, novedadesCompletas: null };
       return;
     }
+    state.errorConexion = false;
 
     // Primera vez que se usa la tabla de planes: sembramos el catálogo de precios
     // (esto sí hace falta siempre — son datos reales, no de prueba)
@@ -1490,14 +1578,7 @@
 
     state.data = {
       clientes: clientesRes.data.map(row => clienteDbToJs(row, rutinasPorDni)),
-      reservas: reservasRes.data.map(r => ({
-        id: r.id, dni: r.dni, fecha: r.fecha, hora: r.hora, estado: r.estado,
-        // Momento en que se hizo la reserva: lo guarda la base (creado_en) o, si
-        // todavía no existe esa columna, sale del número que lleva el id.
-        creadoEn: (r.creado_en ? Date.parse(r.creado_en) : momentoDeId(r.id)) || null,
-        canceladoEn: r.cancelado_en ? Date.parse(r.cancelado_en) : null,
-        porAdmin: !!r.por_admin,
-      })),
+      reservas: reservasRes.data.map(reservaDbToJs),
       // false = a la tabla de reservas le faltan las columnas nuevas (no se pueden avisar cancelaciones)
       novedadesCompletas: reservasRes.data.length ? ('cancelado_en' in reservasRes.data[0]) : null,
       pagos: pagosRes.data.map(pagoDbToJs),
@@ -1526,8 +1607,11 @@
   // true si hay algo escrito o elegido en un formulario de la pantalla: en ese
   // caso no se redibuja, para no borrar lo que la persona está cargando.
   function hayAlgoEscrito() {
+    // Con el cursor en un campo de texto no se redibuja (se cerraría el teclado).
+    // Un desplegable o un selector de fecha con foco pero sin cambios no cuenta.
     const activo = document.activeElement;
-    if (activo && /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName)) return true;
+    if (activo && (activo.tagName === 'TEXTAREA' ||
+        (activo.tagName === 'INPUT' && !/^(checkbox|radio|date|button|submit|range)$/.test(activo.type)))) return true;
     return Array.from(document.querySelectorAll('#root input, #root textarea, #root select')).some(el => {
       if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
       if (el.tagName === 'SELECT') {
@@ -1540,7 +1624,7 @@
 
   async function actualizarPorDetras() {
     if (!state.data) return;
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const cambioElDia = !!diaDibujado && diaDibujado !== hoy;
     if (!cambioElDia && Date.now() - ultimaLectura < REFRESCO_MINIMO_MS) return;
     ultimaLectura = Date.now();
@@ -1551,11 +1635,30 @@
     if (hayAlgoEscrito()) return; // los datos ya están; se ven en el próximo toque
     // Si la app quedó abierta de un día para el otro, no dejar elegido un día que ya pasó
     if (state.cliente && state.selectedDate && state.selectedDate < hoy) state.selectedDate = primerDiaConTurnos();
-    // Los desplegables que estaban abiertos (historial de pagos, "Al día") siguen abiertos
+    redibujarConservando();
+  }
+
+  // Redibuja sin cerrar los desplegables que estaban abiertos (historial de pagos, "Al día")
+  function redibujarConservando() {
     const abiertos = Array.from(document.querySelectorAll('#root details')).map(d => d.open);
     renderApp();
     const nuevos = document.querySelectorAll('#root details');
     if (nuevos.length === abiertos.length) nuevos.forEach((d, i) => { if (abiertos[i]) d.open = true; });
+  }
+
+  // Revisión liviana para administración: trae solo las reservas de la última
+  // semana en adelante (que es donde puede haber novedades), no toda la base.
+  async function refrescarReservasRecientes() {
+    const turno = refreshTurno;
+    const desde = sumarDias(isoDate(ahora()), -7);
+    let res;
+    try { res = await sb.from('reservas').select('*').gte('fecha', desde).order('id').range(0, FILAS_POR_PEDIDO - 1); }
+    catch (e) { return false; }
+    // Si mientras tanto salió una lectura completa, vale esa
+    if (!res || res.error || !res.data || turno !== refreshTurno || !state.data) return false;
+    if (res.data.length >= FILAS_POR_PEDIDO) return false; // demasiadas para una sola página: que lo resuelva la lectura completa
+    state.data.reservas = state.data.reservas.filter(r => r.fecha < desde).concat(res.data.map(reservaDbToJs));
+    return true;
   }
 
   document.addEventListener('visibilitychange', () => {
@@ -1565,8 +1668,13 @@
   // Con administración abierta se vuelve a mirar la base cada medio minuto,
   // para que las reservas y cancelaciones nuevas aparezcan solas.
   const REVISION_ADMIN_MS = 30000;
-  setInterval(() => {
-    if (state.mode === 'admin' && document.visibilityState === 'visible') actualizarPorDetras();
+  setInterval(async () => {
+    if (state.mode !== 'admin' || document.visibilityState !== 'visible' || !state.data) return;
+    const antes = JSON.stringify(state.data.reservas);
+    if (!(await refrescarReservasRecientes())) return;
+    avisarNovedades();
+    if (JSON.stringify(state.data.reservas) === antes || hayAlgoEscrito()) return;
+    redibujarConservando();
   }, REVISION_ADMIN_MS);
 
   function showToast(msg) {
@@ -1574,7 +1682,8 @@
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.classList.remove('show'), 2200);
+    // Los mensajes largos quedan más tiempo en pantalla
+    t._timer = setTimeout(() => t.classList.remove('show'), Math.min(7000, 2200 + Math.max(0, String(msg).length - 30) * 45));
   }
 
   function pillForEstado(estado) {
@@ -1584,8 +1693,41 @@
   }
 
   function money(n) {
-    return '$' + n.toLocaleString('es-AR');
+    return '$' + (Number(n) || 0).toLocaleString('es-AR');
   }
+
+  // Evita que un toque doble (o un segundo toque mientras se está guardando)
+  // repita una acción: mientras la primera no termina, las siguientes se ignoran.
+  let accionesEnCurso = 0;
+  function unaALaVez(fn) {
+    let enCurso = false;
+    return async function (...args) {
+      if (enCurso) return;
+      enCurso = true;
+      accionesEnCurso++;
+      document.body.classList.add('ocupado');
+      try { return await fn.apply(this, args); }
+      finally {
+        enCurso = false;
+        accionesEnCurso--;
+        if (accionesEnCurso <= 0) document.body.classList.remove('ocupado');
+      }
+    };
+  }
+
+  // Primer toque: el botón pide confirmar. Segundo toque (dentro de 4 segundos): se hace.
+  function confirmarEnDosToques(btn, textoConfirmar, accion) {
+    if (btn.dataset.confirmando === '1') { btn.dataset.confirmando = ''; btn.disabled = true; accion(); return; }
+    const original = btn.textContent;
+    btn.dataset.confirmando = '1';
+    btn.textContent = textoConfirmar;
+    btn.style.color = 'var(--red)';
+    setTimeout(() => {
+      if (btn.isConnected && btn.dataset.confirmando === '1') { btn.dataset.confirmando = ''; btn.textContent = original; btn.style.color = ''; }
+    }, 4000);
+  }
+
+  function soloDigitos(t) { return String(t == null ? '' : t).replace(/\D/g, ''); }
 
   // ---------------- Render: Login ----------------
   function renderLogin(errorMsg) {
@@ -1596,8 +1738,9 @@
           <p class="tagline">Rendimiento deportivo — reservá tu turno</p>
         </div>
         <div class="login-form">
+          ${state.errorConexion ? `<div class="banner" style="margin-bottom:6px;"><b>Sin conexión con ORIGO</b>Revisá tu internet y volvé a intentar. <button class="cancel-link" id="reintentarBtn" style="color:var(--text);">Reintentar</button></div>` : ''}
           <label for="dniInput">Tu DNI</label>
-          <input type="text" id="dniInput" inputmode="numeric" placeholder="Ej: 12345678" autocomplete="off" />
+          <input type="text" id="dniInput" inputmode="numeric" placeholder="Ej: 12345678" autocomplete="off" value="${esc(state.loginDni != null ? state.loginDni : dniRecordado())}" />
           <label for="passInput">Contraseña</label>
           <input type="password" id="passInput" placeholder="••••" autocomplete="off" />
           <div class="error-text">${errorMsg || ''}</div>
@@ -1607,6 +1750,11 @@
       </div>
     `;
   }
+
+  // El último DNI que entró en este dispositivo queda escrito para la próxima vez
+  const CLAVE_DNI = 'origo_dni';
+  function dniRecordado() { try { return localStorage.getItem(CLAVE_DNI) || ''; } catch (e) { return ''; } }
+  function recordarDni(dni) { try { if (dni) localStorage.setItem(CLAVE_DNI, dni); else localStorage.removeItem(CLAVE_DNI); } catch (e) {} }
 
   function renderAdminPin(errorMsg) {
     return `
@@ -1665,7 +1813,7 @@
 
   // ---------------- Admin: Pro (control diario) ----------------
   function renderAdminPro(data) {
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const fecha = state.proFecha || hoy;
     const ayerD = new Date(hoy + 'T00:00:00');
     ayerD.setDate(ayerD.getDate() - 1);
@@ -1706,7 +1854,7 @@
       }).join('');
       return `
         <div class="pro-admin-card">
-          <button class="nombre-link pro-admin-nombre" data-ficha-dni="${c.dni}">${c.nombre}</button>
+          <button class="nombre-link pro-admin-nombre" data-ficha-dni="${c.dni}">${esc(c.nombre)}</button>
           <div class="asis-stats" style="margin-bottom:10px;">
             <div class="asis-stat"><span class="num ${r.wellness ? 'color' : ''}" ${r.wellness ? `style="--c:${colorPro('wellness', r.wellness.valor)}"` : ''}>${r.wellness ? r.wellness.valor : '–'}</span><span class="lbl">Wellness (de ${WELLNESS_MAX})</span></div>
             <div class="asis-stat"><span class="num ${r.tqr ? 'color' : ''}" ${r.tqr ? `style="--c:${colorPro('tqr', r.tqr.valor)}"` : ''}>${r.tqr ? r.tqr.valor : '–'}</span><span class="lbl">TQR (6 a 20)</span></div>
@@ -1742,7 +1890,10 @@
     const planesHtml = ordenPlanes.filter(p => grupos[p]).map(plan => {
       const filas = grupos[plan].map(p => `
         <div class="plan-row">
-          <span class="plan-row-dias">${p.dias ? p.dias + (p.dias === 1 ? ' día/sem' : ' días/sem') : 'Integral'}</span>
+          <span class="plan-row-dias">${p.dias ? p.dias + (p.dias === 1 ? ' día/sem' : ' días/sem') : 'Integral'}${(() => {
+            const cuantos = data.clientes.filter(c => c.estado !== 'Baja' && c.plan === p.plan && (c.dias == null ? null : c.dias) === (p.dias == null ? null : p.dias)).length;
+            return cuantos ? ` · ${cuantos} ${cuantos === 1 ? 'cliente' : 'clientes'}` : '';
+          })()}</span>
           <input type="text" inputmode="numeric" class="plan-precio-input" data-plan-id="${p.id}" value="${p.precio}">
           <button class="cancel-link" data-guardar-plan="${p.id}">Guardar</button>
         </div>`).join('');
@@ -1756,7 +1907,7 @@
     const matricula = matriculaPrecio();
 
     return `
-        <p class="sub">Precios de los planes — se aplican al instante a los clientes nuevos y a los que registren un pago</p>
+        <p class="sub">Precios de los planes. Al guardar un precio, los clientes de ese plan pasan a pagarlo desde su próximo pago.</p>
         ${planesHtml}
         <div class="cuota-card">
           <div class="cuota-top">
@@ -1782,8 +1933,25 @@
           </div>
           <div class="pago-detalle" style="margin-top:8px;">Se cuenta desde el día del vencimiento. Con ${diasParaPagar()} ${diasParaPagar() === 1 ? 'día' : 'días'}, una cuota que vence el 1 se puede pagar hasta el ${diasParaPagar()} sin figurar vencida.</div>
         </div>
+        ${(() => {
+          const especiales = clientesReales(data).filter(c => c.estado !== 'Baja' && cuotaEspecialEfectiva(c))
+            .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+          return especiales.length ? `
+        <div class="cuota-card" style="margin-top:10px;">
+          <div class="cuota-nombre" style="margin-bottom:4px;">Cuotas especiales (${especiales.length})</div>
+          <div class="pago-detalle" style="margin-bottom:4px;">Clientes que pagan distinto a su plan. Se cambia desde su ficha, en Editar.</div>
+          ${especiales.map(c => `
+          <div class="pago-fila">
+            <div>
+              <button class="nombre-link p1" data-ficha-dni="${c.dni}">${esc(c.nombre)}</button>
+              <div class="p2">${esc(textoPlan(c))} · el plan vale ${money(precioDe(c.plan, c.dias))}</div>
+            </div>
+            <span class="monto">${money(cuotaEspecialEfectiva(c))}</span>
+          </div>`).join('')}
+        </div>` : '';
+        })()}
         <div class="banner" style="border-color:var(--line); background:var(--surface-2); margin-top:16px;">
-          <b style="color:var(--text-muted);">Ojo</b>Cambiar un precio acá no le modifica la cuota a nadie que ya esté pagando — solo se usa para calcularle el monto a un cliente nuevo o la próxima vez que alguien registre un pago.
+          <b style="color:var(--text-muted);">Ojo</b>Cambiar un precio no modifica los pagos ya registrados ni la cuota de quienes tienen una cuota especial.
         </div>
     `;
   }
@@ -1799,17 +1967,18 @@
 
     const facturacionProyectada = activos.reduce((sum, c) => sum + (c.precio || 0), 0);
 
-    const cuentasDisplay = clientes.map(c => cuotaDisplay(data, c.dni));
+    // Solo los activos: a un pausado o a una baja no hay cuota que reclamarle
+    const cuentasDisplay = activos.map(c => cuotaDisplay(data, c.dni));
     const vencidos = cuentasDisplay.filter(e => e.estado === 'Vencido').length;
     const sinPagos = cuentasDisplay.filter(e => e.estado === 'Sin pagos').length;
     const vencePronto = cuentasDisplay.filter(e => e.prioridad === 1).length;
 
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const turnosHoy = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
     const asistieronHoy = reservas.filter(r => r.fecha === hoy && estadoEfectivo(r) === 'asistio').length;
 
     const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
-    const sinMatricula = matriculaActiva() ? clientes.filter(c => !(c.matricula && c.matricula.pagada)).length : 0;
+    const sinMatricula = matriculaActiva() ? activos.filter(c => !(c.matricula && c.matricula.pagada)).length : 0;
 
     // Lista de cosas que requieren una decisión o acción, ordenadas por urgencia
     const itemsAtencion = [
@@ -1856,7 +2025,7 @@
   }
 
   function asistenciaMesResumen(data, dni) {
-    const hoy = new Date();
+    const hoy = ahora();
     const mesActual = hoy.getMonth();
     const anioActual = hoy.getFullYear();
     const asistencias = data.reservas.filter(r => {
@@ -1909,9 +2078,9 @@
           <div class="admin-field-grid">
             <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
             <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
-            <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?editing.nombre:''}"></label>
-            <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email||'':''}"></label>
-            <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?editing.telefono||'':''}"></label>
+            <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?esc(editing.nombre):''}"></label>
+            <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?esc(editing.email||''):''}"></label>
+            <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?esc(editing.telefono||''):''}"></label>
             <label>Plan
               <select id="fPlan">
                 <option value="START" ${editing&&editing.plan==='START'?'selected':''}>START</option>
@@ -1945,7 +2114,7 @@
             </label>
             <label class="span2">Cuota especial por mes (excepción)
               <input type="text" inputmode="numeric" id="fCuotaEspecial" placeholder="Vacío = el precio de su plan" autocomplete="off"
-                value="${editing && cuotaEspecialDe(editing.dni) ? cuotaEspecialDe(editing.dni) : ''}">
+                value="${editing && cuotaEspecialEfectiva(editing) ? cuotaEspecialEfectiva(editing) : ''}">
             </label>
             <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
               <input type="checkbox" id="fPrueba" style="width:auto;" ${editing&&esPrueba(editing.dni)?'checked':''}>
@@ -1977,7 +2146,7 @@
           <div class="kv-row"><span class="k">Cuota calculada</span><span class="v" id="fPrecioPreview">—</span></div>
           ${!editing ? `<div class="kv-row"><span class="k">Pago inicial</span><span class="v" id="fPagoInicialMonto">—</span></div>
           <div class="pago-detalle" id="fPagoInicialDetalle" style="margin-bottom:6px;"></div>` : ''}
-          <div class="error-text">${formError || ''}</div>
+          <div class="error-text" id="formClienteError">${formError || ''}</div>
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn btn-primary" id="addClienteBtn" style="flex:1;">${editing ? 'Guardar cambios' : 'Agregar cliente'}</button>
             ${editing ? `<button class="btn btn-ghost" id="cancelEditBtn">Cancelar</button>` : ''}
@@ -2149,7 +2318,7 @@
   }
 
   function fichaResumen(data, c, ctx) {
-    const hoyIso = isoDate(new Date());
+    const hoyIso = isoDate(ahora());
     const esteMes = ctx.asistencias.filter(r => r.fecha.slice(0, 7) === hoyIso.slice(0, 7)).length;
     const limite = limiteSemanalDe(c);
     const turnosSemana = reservasEnSemana(data, c.dni, hoyIso).length;
@@ -2202,7 +2371,7 @@
           </div>
           ${ctx.prueba ? `<div class="pago-detalle" style="margin-bottom:6px;">Usuario de prueba: no figura en Cuotas ni suma en lo cobrado.</div>` : ''}
           <div class="kv-row"><span class="k">Plan</span><span class="v">${esc(c.plan)} · ${money(c.precio || 0)} / mes</span></div>
-          ${cuotaEspecialDe(c.dni) ? `<div class="kv-row"><span class="k">Cuota especial</span><span class="v" style="color:var(--amber);">El plan vale ${money(precioDe(c.plan, c.dias) || 0)}</span></div>` : ''}
+          ${cuotaEspecialEfectiva(c) ? `<div class="kv-row"><span class="k">Cuota especial</span><span class="v" style="color:var(--amber);">El plan vale ${money(precioDe(c.plan, c.dias) || 0)}</span></div>` : ''}
           ${infoVencimientoHtml(ctx.cuenta)}
           ${ultimoPago ? `<div class="kv-row"><span class="k">Último pago</span><span class="v">${formatFecha(ultimoPago.fechaPago)} · ${money(ultimoPago.monto || 0)}</span></div>` : ''}
           ${matriculaHtml}
@@ -2406,8 +2575,9 @@
         if (montoEl && cliente) montoEl.textContent = money(montoDe(cliente.precio, previo.dur));
       };
     });
+    // Deshacer un pago borra un registro de plata: pide un segundo toque
     root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
-      btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
+      btn.onclick = () => confirmarEnDosToques(btn, 'Tocá de nuevo para deshacerlo', () => eliminarPago(btn.dataset.eliminarPago));
     });
   }
 
@@ -2456,7 +2626,7 @@
   function estadoCuenta(data, dni) {
     const ultimo = ultimoPagoDe(data, dni);
     if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, limite: null, ultimo: null };
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const vencimiento = ultimo.fechaVencimiento;
     const limite = limitePago(vencimiento);
     let estado = 'Al día';
@@ -2473,7 +2643,7 @@
     const cuenta = estadoCuenta(data, dni);
     if (cuenta.estado === 'Vencido') return { ...cuenta, label: 'Vencido', pill: 'pill-red', prioridad: 0, diasRestantes: null };
     if (cuenta.estado === 'Sin pagos') return { ...cuenta, label: 'Sin pagos', pill: 'pill-red', prioridad: 0, diasRestantes: null };
-    const hoyIso = isoDate(new Date());
+    const hoyIso = isoDate(ahora());
     if (cuenta.estado === 'En período de pago') {
       return { ...cuenta, label: 'Para pagar', pill: 'pill-amber', prioridad: 1, diasRestantes: diasEntre(hoyIso, cuenta.limite) };
     }
@@ -2520,7 +2690,7 @@
     const nota = String(comprobante || '').trim().slice(0, 80);
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
-      dni, fechaPago: isoDate(new Date()), duracionId, dias: diasReales, monto, metodoPago,
+      dni, fechaPago: isoDate(ahora()), duracionId, dias: diasReales, monto, metodoPago,
       fechaVencimiento: isoDate(venc),
       comprobante: nota || null,
     };
@@ -2581,7 +2751,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'origo-pagos-' + isoDate(new Date()) + '.csv';
+    a.download = 'origo-pagos-' + isoDate(ahora()) + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2618,10 +2788,24 @@
       showToast('Ingresá un precio válido.');
       return;
     }
+    const plan = state.data.planes.find(p => p.id === id);
+    const precioViejo = plan ? plan.precio : null;
     const { error } = await sb.from('planes').update({ precio }).eq('id', id);
     if (error) { showToast('No se pudo guardar.'); console.error(error); return; }
+    // Los clientes de ese plan que pagaban el precio anterior pasan al nuevo.
+    // Los que tienen una cuota especial (o una cuota distinta guardada) no se tocan.
+    let cambiaron = 0, quedaron = 0;
+    if (plan && precioViejo !== precio) {
+      const delPlan = state.data.clientes.filter(c => c.plan === plan.plan && (c.dias == null ? null : c.dias) === (plan.dias == null ? null : plan.dias));
+      for (const c of delPlan) {
+        if (cuotaEspecialDe(c.dni) || (c.precio != null && c.precio !== precioViejo)) { quedaron++; continue; }
+        const r = await sb.from('clientes').update({ precio }).eq('dni', c.dni);
+        if (r.error) console.error(r.error); else cambiaron++;
+      }
+    }
     await refreshData();
-    showToast('Precio actualizado');
+    showToast('Precio actualizado.' + (cambiaron ? ` ${cambiaron === 1 ? '1 cliente pasa' : cambiaron + ' clientes pasan'} a pagar ${money(precio)}.` : '')
+      + (quedaron ? ` ${quedaron === 1 ? '1 con cuota especial no cambia' : quedaron + ' con cuota especial no cambian'}.` : ''));
     renderApp();
   }
 
@@ -2717,7 +2901,7 @@
       return `
         <div class="cuota-card">
           <div class="cuota-top">
-            <button class="nombre-link cuota-nombre" data-ficha-dni="${c.dni}">${c.nombre}</button>
+            <button class="nombre-link cuota-nombre" data-ficha-dni="${c.dni}">${esc(c.nombre)}</button>
             <span class="pill ${cuenta.pill}">${cuenta.label}</span>
           </div>
           ${infoVencimientoHtml(cuenta)}
@@ -2727,7 +2911,10 @@
     };
 
     // Los usuarios de prueba no aparecen acá ni suman en lo cobrado
-    const clientes = clientesReales(data);
+    // Las listas de atención son solo de clientes activos; pausados y bajas van aparte
+    const todos = clientesReales(data);
+    const clientes = todos.filter(c => c.estado === 'Activo');
+    const inactivos = todos.filter(c => c.estado !== 'Activo').sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     const urgentes = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 0);
     const proximos = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 1);
     const alDia = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 2);
@@ -2746,11 +2933,11 @@
     const vencidos = urgentes.length;
 
     // Cobrado en el mes en curso
-    const mesHoy = isoDate(new Date()).slice(0, 7);
+    const mesHoy = isoDate(ahora()).slice(0, 7);
     const pagosMes = pagosReales(data).filter(p => p.fechaPago.slice(0, 7) === mesHoy);
     const cobradoMes = pagosMes.reduce((sum, p) => sum + (p.monto || 0), 0);
 
-    const nombreMes = MESES[new Date().getMonth()].toLowerCase();
+    const nombreMes = MESES[ahora().getMonth()].toLowerCase();
     const cob = cobranzaDelMes(data);
     const cobPill = cob.total === 0 ? ''
       : cob.faltan.length === 0 ? '<span class="pill pill-green">Todo liquidado</span>'
@@ -2787,6 +2974,11 @@
         ${seccion('Necesitan atención', urgentes)}
         ${seccion('Por vencer o para pagar', proximos)}
         ${alDiaHtml}
+        ${inactivos.length ? `
+        <details class="cuota-aldiacolapso" style="margin-top:6px;">
+          <summary>Pausados y de baja (${inactivos.length})</summary>
+          <div class="cuota-list" style="margin-top:10px;">${inactivos.map(card).join('')}</div>
+        </details>` : ''}
     `;
   }
 
@@ -2865,12 +3057,12 @@
   }
 
   function fechaAdminTurnos() {
-    return aDiaHabil(state.asistenciasFecha || isoDate(new Date()));
+    return aDiaHabil(state.asistenciasFecha || isoDate(ahora()));
   }
 
   function renderAdminAsistencias(data) {
     const fecha = fechaAdminTurnos();
-    const hoyIso = isoDate(new Date());
+    const hoyIso = isoDate(ahora());
     const vista = state.turnosVista === 'semana' ? 'semana' : 'dia';
     const lunes = mondayOf(fecha);
     const dias = [0, 1, 2, 3, 4].map(i => { const d = new Date(lunes); d.setDate(lunes.getDate() + i); return d; });
@@ -3198,12 +3390,12 @@
 
     return `
       <div class="view">
-        ${tituloVista('perfil', 'Hola, ' + cliente.nombre.split(' ')[0], 'Tu perfil y tu plan en ORIGO')}
+        ${tituloVista('perfil', 'Hola, ' + esc(String(cliente.nombre || '').split(' ')[0]), 'Tu perfil y tu plan en ORIGO')}
         ${bloqueado ? `<div class="banner"><b>Membresía ${cliente.estado.toLowerCase()}</b>Mientras tu membresía no esté activa no podés reservar turnos. Hablá con recepción para regularizarla.</div>` : ''}
         ${cuotaBanner}
         <div class="profile-card">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <p class="plan-name">${cliente.plan}</p>
+            <p class="plan-name">${esc(cliente.plan)}</p>
             ${pillForEstado(cliente.estado)}
           </div>
           <p class="price">${money(cliente.precio)}<small>/ mes</small></p>
@@ -3260,7 +3452,7 @@
   }
 
   function renderMiDia(cliente, data) {
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const titulo = tituloVista('midia', 'Mi día', 'Tu control diario del ' + fechaLarga(hoy).toLowerCase());
 
     if (!data.registrosProListo) {
@@ -3369,7 +3561,7 @@
   // Abre o cierra una tarjeta de "Mi día". Al abrir una ya cargada, arranca
   // con los valores guardados para poder corregirlos.
   function toggleCardPro(tipo) {
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const r = resumenDiaPro(state.data, state.cliente.dni, hoy);
     const abiertoAhora = state.proAbierto || null;
     if (abiertoAhora === tipo) { state.proAbierto = null; renderApp(); return; }
@@ -3388,7 +3580,7 @@
   // Guarda un registro del día. Wellness y TQR son uno por día (si ya existe se
   // actualiza); RPE admite varias sesiones por día.
   async function guardarRegistroPro(tipo, valor, detalle, unoPorDia) {
-    const hoy = isoDate(new Date());
+    const hoy = isoDate(ahora());
     const dni = state.cliente.dni;
     const existente = unoPorDia ? registrosDe(state.data, dni, hoy, tipo)[0] : null;
     const res = existente
@@ -3410,7 +3602,7 @@
     if (!(await guardarRegistroPro('wellness', total, detalle, true))) return;
     state.proDraft = {};
     // Para seguir de corrido: si falta el TQR, se abre esa tarjeta
-    state.proAbierto = resumenDiaPro(state.data, state.cliente.dni, isoDate(new Date())).tqr ? null : 'tqr';
+    state.proAbierto = resumenDiaPro(state.data, state.cliente.dni, isoDate(ahora())).tqr ? null : 'tqr';
     showToast('Wellness guardado');
     renderApp();
     window.scrollTo(0, 0);
@@ -3609,7 +3801,7 @@
   // racha no se "rompa" cada lunes.
   function rachaSemanas(asistencias) {
     const semanas = new Set(asistencias.map(r => isoDate(mondayOf(r.fecha))));
-    const cursor = mondayOf(isoDate(new Date()));
+    const cursor = mondayOf(isoDate(ahora()));
     if (!semanas.has(isoDate(cursor))) cursor.setDate(cursor.getDate() - 7);
     let n = 0;
     while (semanas.has(isoDate(cursor))) { n++; cursor.setDate(cursor.getDate() - 7); }
@@ -3682,7 +3874,7 @@
   function renderReservasAsistencias(cliente, data, mias, asistencias, opts) {
     const admin = !!(opts && opts.admin);
     const compacto = !!(opts && opts.compacto); // vista del cliente: menos números, detalle plegado
-    const hoyIso = isoDate(new Date());
+    const hoyIso = isoDate(ahora());
     const mesHoy = hoyIso.slice(0, 7);
 
     // --- Números generales ---
@@ -3828,7 +4020,7 @@
 
   function renderApp() {
     const root = document.getElementById('root');
-    diaDibujado = isoDate(new Date());
+    diaDibujado = isoDate(ahora());
 
     if (state.mode === 'adminPin') {
       root.innerHTML = renderAdminPin(state.pinError);
@@ -3924,10 +4116,19 @@
       return;
     }
 
+    // Si administración eliminó a este cliente mientras tenía la app abierta, se cierra su sesión
+    if (state.cliente && state.data && !state.errorConexion && state.data.clientes.length && !state.data.clientes.some(c => c.dni === state.cliente.dni)) {
+      state.cliente = null;
+      state.loginError = 'Tu usuario ya no está disponible. Hablá con recepción.';
+    }
+
     if (!state.cliente) {
       root.innerHTML = renderLogin(state.loginError);
       document.getElementById('loginBtn').onclick = onLogin;
+      const reintentar = document.getElementById('reintentarBtn');
+      if (reintentar) reintentar.onclick = async () => { reintentar.disabled = true; reintentar.textContent = 'Probando…'; await refreshData(); renderApp(); };
       document.getElementById('passInput').addEventListener('keydown', e => { if (e.key === 'Enter') onLogin(); });
+      document.getElementById('dniInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('passInput').focus(); });
       document.getElementById('adminLinkBtn').onclick = () => { state.mode = 'adminPin'; renderApp(); };
       return;
     }
@@ -3944,8 +4145,8 @@
     root.innerHTML = `
       <div class="app-header">
         <div class="who">
-          <span class="name">${state.cliente.nombre}</span>
-          <span class="plan">${state.cliente.plan}</span>
+          <span class="name">${esc(state.cliente.nombre)}</span>
+          <span class="plan">${esc(state.cliente.plan)}</span>
         </div>
         <div class="header-right">
           ${pillForEstado(state.cliente.estado)}
@@ -3964,7 +4165,7 @@
         state.view = btn.dataset.view;
         state.slotElegido = null;
         // Si la app quedó abierta de un día para el otro, no dejar seleccionado un día que ya pasó
-        if (state.view === 'turnos' && state.selectedDate < isoDate(new Date())) state.selectedDate = primerDiaConTurnos();
+        if (state.view === 'turnos' && state.selectedDate < isoDate(ahora())) state.selectedDate = primerDiaConTurnos();
         renderApp();
         actualizarPorDetras();
       };
@@ -4060,12 +4261,12 @@
     }
     if (state.view === 'reservas') {
       root.querySelectorAll('[data-cancelar-id]').forEach(btn => {
-        btn.onclick = () => cancelarReserva(btn.dataset.cancelarId);
+        btn.onclick = () => confirmarEnDosToques(btn, 'Tocá de nuevo para cancelar', () => cancelarReserva(btn.dataset.cancelarId));
       });
       const irATurnos = document.getElementById('irATurnosBtn');
       if (irATurnos) irATurnos.onclick = () => {
         state.view = 'turnos';
-        if (state.selectedDate < isoDate(new Date())) state.selectedDate = primerDiaConTurnos();
+        if (state.selectedDate < isoDate(ahora())) state.selectedDate = primerDiaConTurnos();
         renderApp();
         window.scrollTo(0, 0);
       };
@@ -4083,6 +4284,8 @@
     state.proAbierto = undefined;
     state.proDraft = {};
     state.loginError = '';
+    state.loginDni = null;
+    recordarDni(''); // quien toca "Salir" no deja su DNI escrito en el dispositivo
     renderApp();
   }
 
@@ -4134,14 +4337,26 @@
     if (btn) { btn.disabled = true; btn.textContent = 'Ingresando…'; }
     // Se vuelve a leer la base antes de entrar: así un cliente recién cargado
     // (o con la contraseña recién cambiada) entra aunque tuviera la página abierta.
+    state.loginDni = dni; // si algo falla, el DNI queda escrito
     await refreshData();
-    const found = state.data.clientes.find(c => c.dni === dni);
+    if (state.errorConexion) {
+      state.loginError = 'No hay conexión con ORIGO. Revisá tu internet y probá de nuevo.';
+      renderApp();
+      return;
+    }
+    // Se busca tal cual y, si no aparece, comparando solo los números (por si
+    // el DNI se cargó con puntos o el cliente lo escribe con espacios).
+    const found = state.data.clientes.find(c => c.dni === dni)
+      || (soloDigitos(dni) ? state.data.clientes.find(c => soloDigitos(c.dni) === soloDigitos(dni)) : undefined);
     if (!found) {
       state.loginError = 'No encontramos ese DNI. Verificalo o hablá con recepción.';
       renderApp();
       return;
     }
-    const ok = await verifyPassword(pass, found.password);
+    // Un espacio de más al principio o al final (lo agregan algunos teclados) no cuenta
+    let claveOk = pass;
+    let ok = await verifyPassword(pass, found.password);
+    if (!ok && pass !== pass.trim()) { claveOk = pass.trim(); ok = await verifyPassword(claveOk, found.password); }
     if (!ok) {
       state.loginError = 'Contraseña incorrecta.';
       renderApp();
@@ -4150,8 +4365,8 @@
     // Si todavía tenía la contraseña vieja en texto plano, la protegemos ahora
     // que sabemos que es correcta, sin que el cliente note nada.
     if (!esPasswordHasheada(found.password)) {
-      const nuevoHash = await hashPassword(pass);
-      const { error: errUpgrade } = await sb.from('clientes').update({ password: nuevoHash }).eq('dni', dni);
+      const nuevoHash = await hashPassword(claveOk);
+      const { error: errUpgrade } = await sb.from('clientes').update({ password: nuevoHash }).eq('dni', found.dni);
       if (errUpgrade) {
         console.error('No se pudo proteger la contraseña automáticamente:', errUpgrade.message);
       } else {
@@ -4160,6 +4375,8 @@
     }
     state.cliente = found;
     state.loginError = '';
+    state.loginDni = null;
+    recordarDni(found.dni);
     // Los clientes PRO entran directo a su control diario
     state.view = esPro(found) ? 'midia' : 'perfil';
     state.proAbierto = undefined;
@@ -4177,6 +4394,11 @@
       return;
     }
     await refreshData(); // administración siempre arranca con los datos del momento
+    if (state.errorConexion) {
+      state.pinError = 'No hay conexión con ORIGO. Revisá tu internet y probá de nuevo.';
+      renderApp();
+      return;
+    }
     state.novedadesAvisadas = {};
     state.novedadesListas = false;
     state.pinError = '';
@@ -4228,9 +4450,21 @@
     document.getElementById('addClienteBtn').onclick = onAddCliente;
   }
 
+  // Muestra un error en el formulario de cliente sin redibujar la pantalla, para
+  // que no se pierda nada de lo que ya estaba escrito.
+  function errorFormCliente(msg) {
+    state.adminFormError = msg;
+    state.adminFormNotice = '';
+    const el = document.getElementById('formClienteError');
+    if (!el) { renderApp(); return; }
+    el.textContent = msg;
+    el.scrollIntoView({ block: 'center' });
+  }
+
   async function onAddCliente() {
     const dniField = document.getElementById('fDni');
-    const dni = dniField.value.trim();
+    // En un cliente nuevo el DNI se guarda sin puntos ni espacios
+    const dni = state.editingDni || dniField.value.trim().replace(/[.\s]/g, '');
     const password = document.getElementById('fPass').value.trim();
     const nombre = document.getElementById('fNombre').value.trim();
     const email = document.getElementById('fEmail').value.trim();
@@ -4250,11 +4484,7 @@
       : (marcarPrueba ? ' Quedó como usuario de prueba.' : '');
 
     if (!dni || !nombre || (!state.editingDni && !password)) {
-      state.adminFormError = state.editingDni
-        ? 'Completá al menos DNI y nombre.'
-        : 'Completá al menos DNI, contraseña y nombre.';
-      state.adminFormNotice = '';
-      renderApp();
+      errorFormCliente(state.editingDni ? 'Completá al menos DNI y nombre.' : 'Completá al menos DNI, contraseña y nombre.');
       return;
     }
 
@@ -4262,12 +4492,14 @@
     const especialTexto = document.getElementById('fCuotaEspecial').value.trim();
     const cuotaEspecial = especialTexto === '' ? null : parseInt(especialTexto.replace(/[.\s$]/g, ''), 10);
     if (especialTexto !== '' && (!/^[\d.\s$]+$/.test(especialTexto) || !(cuotaEspecial > 0))) {
-      state.adminFormError = 'La cuota especial tiene que ser un monto en pesos (por ejemplo 100000), o quedar vacía.';
-      state.adminFormNotice = '';
-      renderApp();
+      errorFormCliente('La cuota especial tiene que ser un monto en pesos (por ejemplo 100000), o quedar vacía.');
       return;
     }
     const precio = cuotaEspecial || precioDe(plan, dias);
+    if (!precio) {
+      errorFormCliente('Ese plan no tiene precio para esa cantidad de días. Elegí otra combinación o cargale una cuota especial.');
+      return;
+    }
     const notaCuota = (ok, antes) => !ok ? ' Ojo: no se pudo guardar la cuota especial, probá de nuevo.'
       : (cuotaEspecial && cuotaEspecial !== antes) ? ` Cuota especial: ${money(cuotaEspecial)} por mes.`
       : (!cuotaEspecial && antes) ? ' Volvió a la cuota de su plan.' : '';
@@ -4286,7 +4518,7 @@
       const candidato = { ...cActual, ...datosComunes, password: nuevoPassword };
       const nota = aplicarTransicionEstado(candidato, estadoAnterior, estado);
       const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', state.editingDni);
-      if (error) { state.adminFormError = 'No se pudo guardar (' + error.message + ')'; renderApp(); return; }
+      if (error) { errorFormCliente('No se pudo guardar (' + error.message + ')'); return; }
       const dniEditado = state.editingDni;
       const eraPrueba = esPrueba(dniEditado);
       const cuotaAntes = cuotaEspecialDe(dniEditado);
@@ -4296,17 +4528,15 @@
       // Se confirma contra lo que realmente quedó guardado en la base
       const okMarca = esPrueba(dniEditado) === marcarPrueba;
       state.adminFormError = '';
-      state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}${
+      state.adminFormNotice = `${esc(nombre)} se actualizó correctamente.${nota}${
         !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}${
         notaCuota(cuotaEspecialDe(dniEditado) === cuotaEspecial, cuotaAntes)}`;
       renderApp();
       return;
     }
 
-    if (state.data.clientes.some(c => c.dni === dni)) {
-      state.adminFormError = 'Ya existe un cliente con ese DNI.';
-      state.adminFormNotice = '';
-      renderApp();
+    if (state.data.clientes.some(c => c.dni === dni || (soloDigitos(dni) && soloDigitos(c.dni) === soloDigitos(dni)))) {
+      errorFormCliente('Ya existe un cliente con ese DNI.');
       return;
     }
     // La casilla solo existe si la matrícula se está cobrando
@@ -4315,18 +4545,18 @@
     const passwordHash = await hashPassword(password);
     const nuevoCliente = {
       dni, ...datosComunes, password: passwordHash,
-      matricula: { pagada: matriculaPagada, fechaPago: matriculaPagada ? isoDate(new Date()) : null },
-      pausadoDesde: estado === 'Pausado' ? isoDate(new Date()) : null,
+      matricula: { pagada: matriculaPagada, fechaPago: matriculaPagada ? isoDate(ahora()) : null },
+      pausadoDesde: estado === 'Pausado' ? isoDate(ahora()) : null,
     };
     const { error: errCliente } = await sb.from('clientes').insert(clienteJsToDb(nuevoCliente));
-    if (errCliente) { state.adminFormError = 'No se pudo crear (' + errCliente.message + ')'; renderApp(); return; }
+    if (errCliente) { errorFormCliente('No se pudo crear (' + errCliente.message + ')'); return; }
 
     let notaPago = '';
     const duracionPago = document.getElementById('fDuracionPago').value;
     if (duracionPago) {
       const dur = duracionPorId(duracionPago);
       const metodoPago = document.getElementById('fMetodoPago').value;
-      const hoy = new Date();
+      const hoy = ahora();
       hoy.setHours(0, 0, 0, 0);
       const venc = calcularVencimiento(hoy, dur);
       const diasReales = Math.round((venc - hoy) / 86400000);
@@ -4348,7 +4578,7 @@
     await refreshData();
     state.adminFormError = '';
     state.nuevoClienteAbierto = false;
-    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}${
+    state.adminFormNotice = `${esc(nombre)} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}${
       cuotaEspecial ? notaCuota(cuotaEspecialDe(dni) === cuotaEspecial, null) : ''}`;
     renderApp();
   }
@@ -4358,7 +4588,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'origo-backup-' + isoDate(new Date()) + '.json';
+    a.download = 'origo-backup-' + isoDate(ahora()) + '.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -4386,6 +4616,9 @@
     if (state.fichaDni === dni) { cerrarFicha(); state.fichaOrigen = 'clientes'; }
     const { error } = await sb.from('clientes').delete().eq('dni', dni);
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
+    // Sus turnos que todavía no empezaron se cancelan, para que no sigan ocupando lugar
+    const futuros = turnosFuturosDe(dni);
+    for (const r of futuros) { await marcarCancelada(r.id); state.misAcciones['c-' + r.id] = true; }
     // Sus registros de control diario se borran con él (si la tabla existe)
     if (state.data.registrosProListo) await sb.from('registros_pro').delete().eq('dni', dni);
     // Y su cuota especial y su marca de usuario de prueba, para que no las herede otro cliente con el mismo DNI
@@ -4398,21 +4631,29 @@
       await sb.from('config').delete().eq('clave', CLAVE_PRUEBA + dni);
     }
     await refreshData();
-    showToast('Cliente eliminado');
+    showToast('Cliente eliminado.' + (futuros.length ? ` Se ${futuros.length === 1 ? 'canceló su turno reservado' : 'cancelaron sus ' + futuros.length + ' turnos reservados'}.` : ''));
     renderApp();
+  }
+
+  // Turnos reservados de un cliente que todavía no empezaron
+  function turnosFuturosDe(dni) {
+    return state.data.reservas.filter(r => r.dni === dni && r.estado === 'reservado' && !turnoYaEmpezo(r.fecha, r.hora));
   }
 
   function aplicarTransicionEstado(c, estadoAnterior, nuevoEstado) {
     if (nuevoEstado === estadoAnterior) return '';
+    // Al pausar o dar de baja no se le cancelan los turnos solos: se avisa
+    const nFuturos = nuevoEstado === 'Activo' ? 0 : turnosFuturosDe(c.dni).length;
+    const avisoTurnos = nFuturos ? ` Ojo: tiene ${nFuturos === 1 ? '1 turno reservado' : nFuturos + ' turnos reservados'}; cancelalo${nFuturos === 1 ? '' : 's'} desde Turnos si no va a venir.` : '';
     if (nuevoEstado === 'Baja') {
       c.pausadoDesde = null;
-      if (!matriculaActiva()) return '';
+      if (!matriculaActiva()) return avisoTurnos;
       c.matricula = { pagada: false, fechaPago: null };
-      return ' Se reinició su matrícula: va a tener que pagarla de nuevo si vuelve.';
+      return ' Se reinició su matrícula: va a tener que pagarla de nuevo si vuelve.' + avisoTurnos;
     }
     if (nuevoEstado === 'Pausado') {
-      c.pausadoDesde = isoDate(new Date());
-      return ' Empieza a correr el plazo de pausa (máximo 3 meses).';
+      c.pausadoDesde = isoDate(ahora());
+      return ' Empieza a correr el plazo de pausa (máximo 3 meses).' + avisoTurnos;
     }
     if (nuevoEstado === 'Activo') {
       c.pausadoDesde = null;
@@ -4437,7 +4678,7 @@
     const c = state.data.clientes.find(x => x.dni === dni);
     if (!c) return;
     const { error } = await sb.from('clientes')
-      .update({ matricula_pagada: true, matricula_fecha_pago: isoDate(new Date()) })
+      .update({ matricula_pagada: true, matricula_fecha_pago: isoDate(ahora()) })
       .eq('dni', dni);
     if (error) { showToast('No se pudo registrar.'); console.error(error); return; }
     await refreshData();
@@ -4456,7 +4697,7 @@
     }
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     const { error } = await sb.from('rutinas').insert({
-      id: 'rutina-' + Date.now(), dni, titulo, url, fecha: isoDate(new Date()),
+      id: 'rutina-' + Date.now(), dni, titulo, url, fecha: isoDate(ahora()),
     });
     if (error) { showToast('No se pudo agregar la rutina.'); console.error(error); return; }
     await refreshData();
@@ -4475,7 +4716,7 @@
 
   function diasPausado(c) {
     if (!c.pausadoDesde) return null;
-    const hoy = new Date();
+    const hoy = ahora();
     hoy.setHours(0, 0, 0, 0);
     const desde = new Date(c.pausadoDesde + 'T00:00:00');
     return Math.round((hoy - desde) / 86400000);
@@ -4497,6 +4738,11 @@
   }
 
   async function reservarTurnoInterno(hora) {
+    if (state.cliente.estado !== 'Activo') {
+      showToast('Tu membresía no está activa: no podés reservar.');
+      renderApp();
+      return;
+    }
     if (turnoYaEmpezo(state.selectedDate, hora)) {
       showToast('Ese turno ya empezó. Elegí uno más tarde.');
       renderApp();
@@ -4544,17 +4790,14 @@
     // Segundo control: si otro cliente anotó en el mismo instante y el turno
     // quedó pasado de cupo, esta reserva se deshace. (El usuario de prueba no
     // ocupa lugar, así que no puede pasarse.)
-    if (!esPrueba(dni)) {
-      const despues = await reservasFrescasDelDia(fecha);
-      if (despues && ocupadosEnTurno({ reservas: despues }, fecha, hora, dni) > CUPO) {
-        await sb.from('reservas').update({ estado: 'cancelado' }).eq('id', nueva.id);
-        await refreshData();
-        showToast('Ese turno se completó justo antes. Elegí otro horario.');
-        renderApp();
-        return;
-      }
-    }
     await refreshData();
+    if (!esPrueba(dni) && !state.errorConexion && ocupadosEnTurno(state.data, fecha, hora, dni) > CUPO) {
+      await sb.from('reservas').update({ estado: 'cancelado' }).eq('id', nueva.id);
+      await refreshData();
+      showToast('Ese turno se completó justo antes. Elegí otro horario.');
+      renderApp();
+      return;
+    }
     showToast('Turno reservado: ' + hora + ' hs');
     renderApp();
   }
@@ -4572,6 +4815,31 @@
     showToast('Turno cancelado');
     renderApp();
   }
+
+  registrarNuevoPago = unaALaVez(registrarNuevoPago);
+  eliminarPago = unaALaVez(eliminarPago);
+  guardarDiasParaPagar = unaALaVez(guardarDiasParaPagar);
+  guardarPrecioPlan = unaALaVez(guardarPrecioPlan);
+  guardarPrecioMatricula = unaALaVez(guardarPrecioMatricula);
+  guardarMatriculaActiva = unaALaVez(guardarMatriculaActiva);
+  onAddCliente = unaALaVez(onAddCliente);
+  eliminarCliente = unaALaVez(eliminarCliente);
+  cambiarEstadoCliente = unaALaVez(cambiarEstadoCliente);
+  registrarMatricula = unaALaVez(registrarMatricula);
+  agregarRutina = unaALaVez(agregarRutina);
+  eliminarRutina = unaALaVez(eliminarRutina);
+  marcarAsistencia = unaALaVez(marcarAsistencia);
+  anotarDesdeAdmin = unaALaVez(anotarDesdeAdmin);
+  cancelarDesdeAdmin = unaALaVez(cancelarDesdeAdmin);
+  cancelarReserva = unaALaVez(cancelarReserva);
+  guardarWellness = unaALaVez(guardarWellness);
+  guardarTqr = unaALaVez(guardarTqr);
+  guardarRpe = unaALaVez(guardarRpe);
+  borrarRegistroPro = unaALaVez(borrarRegistroPro);
+  cambiarMiPassword = unaALaVez(cambiarMiPassword);
+  reservarTurno = unaALaVez(reservarTurno);
+  onLogin = unaALaVez(onLogin);
+  onPinSubmit = unaALaVez(onPinSubmit);
 
   async function init() {
     await refreshData();
