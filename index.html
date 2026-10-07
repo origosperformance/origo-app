@@ -822,7 +822,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '7/10/2026 · 22';
+  const VERSION_APP = '7/10/2026 · 24';
 
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
@@ -1076,12 +1076,18 @@
   //  - si arranca un día 1 ya está ordenado: null (va el pago común de 1 mes)
   //  - dentro del plazo de pago (del 1 al 10): la cuota completa
   //  - después: 3, 2 o 1 semanas según lo que falte para fin de mes
+  // 'base' es donde termina lo que el cliente ya tiene pago (o hoy si arranca),
+  // así que al que pagó hasta el 18 le tocan 2 semanas para llegar al día 1.
   function sugerenciaFinDeMes(base) {
     if (base.getDate() === 1) return null;
     if (base.getDate() <= diasParaPagar()) return 'fm-mes';
     const semanas = Math.min(3, Math.max(1, Math.round(diasHastaFinDeMes(base) / 7)));
     return 'fm-' + semanas + 's';
   }
+
+  // Las opciones "desde hoy" llevan este prefijo en el desplegable. Es solo para
+  // saber desde qué fecha contar: en el pago se guarda la duración sin el prefijo.
+  const PREFIJO_DESDE_HOY = 'hoy:';
 
   // Opciones del desplegable de duración. 'precio' null = no mostrar montos.
   function opcionesDuracionHtml(base, precio) {
@@ -1090,23 +1096,44 @@
     const opcion = (d, elegida, extra) =>
       `<option value="${d.id}" ${elegida ? 'selected' : ''}>${d.label}${conPrecio ? ' — ' + money(montoDe(precio, d)) : ''}${extra || ''}</option>`;
     const comunes = DURACIONES.filter(d => !d.oculta).map(d => opcion(d, !sugerida && d.id === '1m')).join('');
-    if (!sugerida) return comunes;
+
+    // Cliente que venía pagando y se atrasó: el período sugerido arranca donde
+    // terminó su pago anterior (antes de hoy). Pasado el plazo del mes se ofrece
+    // además cobrarle por semanas contando desde hoy, por si estuvo ausente.
+    const hoy = todayMidnight();
+    let desdeHoy = '';
+    if (base < hoy && hoy.getDate() > diasParaPagar()) {
+      const diasHoy = diasHastaFinDeMes(hoy);
+      const ops = DURACIONES_FIN_DE_MES
+        .filter(d => d.semanas < 4 && (d.semanas - 1) * 7 < diasHoy)
+        .map(d => `<option value="${PREFIJO_DESDE_HOY}${d.id}">${d.corto} desde hoy${conPrecio ? ' — ' + money(montoDe(precio, d)) : ''}</option>`).join('');
+      if (ops) desdeHoy = `<optgroup label="Si estuvo ausente: contar desde hoy">${ops}</optgroup>`;
+    }
+
+    if (!sugerida) return desdeHoy ? `<optgroup label="Períodos completos">${comunes}</optgroup>${desdeHoy}` : comunes;
     const dias = diasHastaFinDeMes(base);
     // Solo las semanas que tienen sentido para lo que falta del mes
     const finDeMes = DURACIONES_FIN_DE_MES
       .filter(d => d.id === sugerida || (d.id === 'fm-mes' ? dias > 21 : (d.semanas - 1) * 7 < dias))
       .map(d => opcion(d, d.id === sugerida, d.id === sugerida ? ' · sugerido' : '')).join('');
-    return `<optgroup label="Para quedar venciendo el día 1">${finDeMes}</optgroup><optgroup label="Otros períodos">${comunes}</optgroup>`;
+    return `<optgroup label="Para quedar venciendo el día 1">${finDeMes}</optgroup><optgroup label="Otros períodos">${comunes}</optgroup>${desdeHoy}`;
   }
 
   // Texto que explica qué cubre un pago antes de registrarlo
   function textoPeriodoPago(base, venc, dur) {
+    const vencIso = isoDate(venc);
     if (dur && dur.tipo === 'finmes') {
       const dias = Math.round((venc - base) / 86400000);
       return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes (' + dias + (dias === 1 ? ' día' : ' días') + '). '
-        + 'La cuota siguiente vence el ' + formatFechaCorta(isoDate(venc)) + ' y se paga hasta el ' + formatFechaCorta(limitePago(isoDate(venc))) + '.';
+        + 'La cuota siguiente vence el ' + formatFechaCorta(vencIso) + ' y se paga hasta el ' + formatFechaCorta(limitePago(vencIso)) + '.';
     }
-    return 'Este pago cubre del ' + formatFechaCorta(isoDate(base)) + ' al ' + formatFechaCorta(isoDate(venc)) + '.';
+    const texto = 'Este pago cubre del ' + formatFechaCorta(isoDate(base)) + ' al ' + formatFechaCorta(vencIso) + '.';
+    // Si no termina un día 1, el mes en que termina se le va a reclamar igual
+    if (venc.getDate() !== 1) {
+      return texto + ' Ojo: no queda venciendo el día 1. La cuota de ' + MESES[venc.getMonth()].toLowerCase()
+        + ' se le va a pedir igual hasta el ' + formatFechaCorta(limitePago(vencIso)) + '.';
+    }
+    return texto;
   }
 
   // Calcula la fecha de vencimiento según el tipo de duración (días corridos,
@@ -1927,11 +1954,11 @@
         <div class="cuota-card" style="margin-top:10px;">
           <div class="cuota-nombre" style="margin-bottom:8px;">Plazo de pago</div>
           <div class="plan-row">
-            <span class="plan-row-dias">Días para pagar la cuota</span>
+            <span class="plan-row-dias">Último día del mes para pagar</span>
             <input type="text" inputmode="numeric" class="plan-precio-input" id="diasParaPagarInput" value="${diasParaPagar()}">
             <button class="cancel-link" id="guardarDiasParaPagarBtn">Guardar</button>
           </div>
-          <div class="pago-detalle" style="margin-top:8px;">Se cuenta desde el día del vencimiento. Con ${diasParaPagar()} ${diasParaPagar() === 1 ? 'día' : 'días'}, una cuota que vence el 1 se puede pagar hasta el ${diasParaPagar()} sin figurar vencida.</div>
+          <div class="pago-detalle" style="margin-top:8px;">La cuota de cada mes se paga del 1 al ${diasParaPagar()}. Pasado ese día, quien no tenga el mes pago figura con la cuota vencida y no puede reservar turnos hasta pagar, aunque su último pago llegue hasta más adelante en el mes.</div>
         </div>
         ${(() => {
           const especiales = clientesReales(data).filter(c => c.estado !== 'Baja' && cuotaEspecialEfectiva(c))
@@ -2588,9 +2615,10 @@
   }
 
   // ---- Plazo de pago ----
-  // Cantidad de días que hay para pagar la cuota, contando el día del
-  // vencimiento. Con 10: una cuota que vence el 1 se puede pagar hasta el 10
-  // sin figurar vencida. Se cambia desde la pestaña Planes.
+  // Último día de cada mes para pagar la cuota. Con 10: la cuota del mes se
+  // paga del 1 al 10 y el 11 figura vencido todo el que no tenga el mes pago,
+  // llegue hasta donde llegue su último pago. Se cambia desde la pestaña Planes.
+  // (En la base se sigue llamando "dias_para_pagar".)
   const DIAS_PARA_PAGAR_DEFECTO = 10;
   function diasParaPagar() {
     const fila = state.data && state.data.config ? state.data.config.find(c => c.clave === 'dias_para_pagar') : null;
@@ -2604,9 +2632,19 @@
     return isoDate(d);
   }
 
-  // Último día para pagar una cuota que venció en 'vencIso'
+  // Último día para pagar la cuota del mes de 'fecha' (si el mes es más corto
+  // que el día configurado, es el último día de ese mes)
+  function limiteDelMes(fecha) {
+    const ultimoDia = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 0).getDate();
+    return isoDate(new Date(fecha.getFullYear(), fecha.getMonth(), Math.min(diasParaPagar(), ultimoDia)));
+  }
+
+  // Último día para hacer el pago que sigue a uno que llega hasta 'vencIso'.
+  // El primer mes que ese pago no cubre entero es el mes de 'vencIso', así que
+  // el límite es el día de pago de ese mismo mes: con pago hasta el 1/11 o hasta
+  // el 18/11, hay que pagar antes del 10/11.
   function limitePago(vencIso) {
-    return sumarDias(vencIso, diasParaPagar() - 1);
+    return limiteDelMes(new Date(vencIso + 'T00:00:00'));
   }
 
   function formatFecha(iso) {
@@ -2618,21 +2656,35 @@
     return Math.round((new Date(hastaIso + 'T00:00:00') - new Date(desdeIso + 'T00:00:00')) / 86400000);
   }
 
-  // Estados posibles:
+  // La cuota de cada mes se paga del 1 al día de pago (10). El estado sale de
+  // hasta dónde llega el último pago ('vencimiento') y de en qué parte del mes
+  // estamos. El mes que hay que pagar es el del vencimiento, porque es el primero
+  // que el último pago no cubre entero.
   //  'Sin pagos'          nunca pagó
-  //  'Al día'             todavía no llegó (o es hoy) el vencimiento
-  //  'En período de pago' ya venció pero está dentro del plazo para pagar
-  //  'Vencido'            se pasó del plazo
+  //  'Al día'             todavía no empezó el mes que tiene que pagar
+  //  'En período de pago' estamos entre el 1 y el día de pago de ese mes
+  //  'Vencido'            pasó el día de pago y no lo pagó, aunque su último
+  //                       pago llegue hasta más adelante en el mes (ej. el 18)
+  // 'inicioPlazo' y 'limite' son el primer y el último día para pagar.
   function estadoCuenta(data, dni) {
     const ultimo = ultimoPagoDe(data, dni);
-    if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, limite: null, ultimo: null };
+    if (!ultimo) return { estado: 'Sin pagos', vencimiento: null, inicioPlazo: null, limite: null, ultimo: null };
     const hoy = isoDate(ahora());
     const vencimiento = ultimo.fechaVencimiento;
+    const inicioPlazo = vencimiento.slice(0, 8) + '01';
     const limite = limitePago(vencimiento);
     let estado = 'Al día';
     if (hoy > limite) estado = 'Vencido';
-    else if (hoy > vencimiento) estado = 'En período de pago';
-    return { estado, vencimiento, limite, ultimo };
+    else if (hoy >= inicioPlazo) estado = 'En período de pago';
+    return { estado, vencimiento, inicioPlazo, limite, ultimo };
+  }
+
+  // Con la cuota vencida (pasó el día de pago y no tiene el mes pago) el cliente
+  // no puede reservar turnos nuevos. No alcanza al que nunca pagó ('Sin pagos'),
+  // que solo figura para atender, ni a los usuarios de prueba. Los turnos que ya
+  // tenía reservados quedan, y administración lo puede seguir anotando.
+  function cuotaImpideReservar(data, dni) {
+    return !esPrueba(dni) && estadoCuenta(data, dni).estado === 'Vencido';
   }
 
   const DIAS_AVISO_VENCIMIENTO = 7;
@@ -2647,7 +2699,8 @@
     if (cuenta.estado === 'En período de pago') {
       return { ...cuenta, label: 'Para pagar', pill: 'pill-amber', prioridad: 1, diasRestantes: diasEntre(hoyIso, cuenta.limite) };
     }
-    const diasRestantes = diasEntre(hoyIso, cuenta.vencimiento);
+    // Al día: los días que faltan para que empiece el mes que tiene que pagar
+    const diasRestantes = diasEntre(hoyIso, cuenta.inicioPlazo);
     if (diasRestantes <= DIAS_AVISO_VENCIMIENTO) {
       return { ...cuenta, label: 'Vence pronto', pill: 'pill-amber', prioridad: 1, diasRestantes };
     }
@@ -2655,19 +2708,26 @@
   }
 
   // Desde qué fecha cuenta el próximo pago de un cliente:
-  //  - si está al día o dentro del plazo de pago, sigue desde el vencimiento
-  //    anterior (no pierde días por pagar antes ni corre la fecha por pagar unos días después)
-  //  - si nunca pagó o se pasó del plazo, cuenta desde hoy
+  //  - si su último pago llega hasta este mes o más adelante, sigue desde ahí,
+  //    esté o no vencido: no pierde los días que ya pagó, y si se atrasó paga
+  //    desde donde terminó su pago (el que tenía hasta el día 1 paga el mes entero)
+  //  - si nunca pagó o su último pago terminó en un mes anterior, cuenta desde
+  //    hoy, como un cliente que arranca
   function baseProximoPago(data, dni) {
     const cuenta = estadoCuenta(data, dni);
-    if (cuenta.ultimo && cuenta.estado !== 'Vencido') return new Date(cuenta.vencimiento + 'T00:00:00');
-    return todayMidnight();
+    const hoy = todayMidnight();
+    const inicioMes = isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    if (cuenta.ultimo && cuenta.vencimiento >= inicioMes) return new Date(cuenta.vencimiento + 'T00:00:00');
+    return hoy;
   }
 
+  // 'duracionId' puede venir con el prefijo "desde hoy" del desplegable
   function periodoNuevoPago(data, dni, duracionId) {
-    const dur = duracionPorId(duracionId);
-    const base = baseProximoPago(data, dni);
-    const venc = calcularVencimiento(base, dur);
+    const id = String(duracionId || '');
+    const desdeHoy = id.startsWith(PREFIJO_DESDE_HOY);
+    const dur = duracionPorId(desdeHoy ? id.slice(PREFIJO_DESDE_HOY.length) : id);
+    const base = desdeHoy ? todayMidnight() : baseProximoPago(data, dni);
+    const venc = dur ? calcularVencimiento(base, dur) : null;
     return { dur, base, venc };
   }
 
@@ -2683,14 +2743,15 @@
 
   async function registrarNuevoPago(dni, duracionId, metodoPago, comprobante) {
     const cliente = state.data.clientes.find(c => c.dni === dni);
-    if (!duracionPorId(duracionId) || !cliente) return;
+    if (!cliente) return;
     const { dur, base, venc } = periodoNuevoPago(state.data, dni, duracionId);
+    if (!dur) return;
     const diasReales = Math.round((venc - base) / 86400000);
     const monto = montoDe(cliente.precio, dur);
     const nota = String(comprobante || '').trim().slice(0, 80);
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
-      dni, fechaPago: isoDate(ahora()), duracionId, dias: diasReales, monto, metodoPago,
+      dni, fechaPago: isoDate(ahora()), duracionId: dur.id, dias: diasReales, monto, metodoPago,
       fechaVencimiento: isoDate(venc),
       comprobante: nota || null,
     };
@@ -2714,7 +2775,7 @@
   async function guardarDiasParaPagar(valorTexto) {
     const valor = parseInt(String(valorTexto).replace(/[^\d]/g, ''), 10);
     if (!valor || valor < 1 || valor > 31) {
-      showToast('Ingresá un número de días entre 1 y 31.');
+      showToast('Ingresá un día del mes entre 1 y 31.');
       return;
     }
     const existe = state.data.config.some(c => c.clave === 'dias_para_pagar');
@@ -2824,19 +2885,24 @@
 
   // Renglones de vencimiento de una cuenta (pestaña Cuotas y ficha del cliente)
   function infoVencimientoHtml(cuenta) {
-    const dias = (n) => ' (' + n + (n === 1 ? ' día)' : ' días)');
+    const dias = (n) => n === 0 ? ' (hoy)' : ' (' + n + (n === 1 ? ' día)' : ' días)');
     if (!cuenta.ultimo) return `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
+    // Hasta dónde llega lo que ya pagó: puede ser más adelante aunque figure vencido
+    const hoyIso = isoDate(ahora());
+    const pagoHasta = `<div class="kv-row"><span class="k">${cuenta.vencimiento >= hoyIso ? 'Tiene pago hasta' : 'Su pago terminó'}</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>`;
     if (cuenta.estado === 'En período de pago') {
       return `
-          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          ${pagoHasta}
           <div class="kv-row"><span class="k">Puede pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}${dias(cuenta.diasRestantes)}</span></div>`;
     }
     if (cuenta.estado === 'Vencido') {
       return `
-          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          ${pagoHasta}
           <div class="kv-row"><span class="k">El plazo para pagar terminó</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
     }
-    return `<div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${dias(cuenta.diasRestantes)}</span></div>`;
+    return `
+          ${pagoHasta}
+          <div class="kv-row"><span class="k">Próxima cuota</span><span class="v">del ${formatFechaCorta(cuenta.inicioPlazo)} al ${formatFechaCorta(cuenta.limite)}${cuenta.diasRestantes ? ' (en ' + cuenta.diasRestantes + (cuenta.diasRestantes === 1 ? ' día)' : ' días)') : ''}</span></div>`;
   }
 
   // Controles para registrar un pago de un cliente (pestaña Cuotas y ficha del cliente)
@@ -2875,7 +2941,7 @@
       const dur = duracionPorId(sugerenciaFinDeMes(base) || '1m');
       faltan.push({ c, dur, monto: montoDe(c.precio, dur), hasta: ultimo ? ultimo.fechaVencimiento : null });
     });
-    const limiteIso = isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), diasParaPagar()));
+    const limiteIso = limiteDelMes(hoy);
     return {
       total: activos.length,
       pagaron: activos.length - faltan.length,
@@ -3369,24 +3435,39 @@
     // Usuario de prueba: siempre se muestra al día. Si no tiene un pago vigente,
     // se le muestra un vencimiento de ejemplo (dentro de un mes).
     if (esPrueba(cliente.dni) && cuenta.estado !== 'Al día') {
-      cuenta = { ...cuenta, estado: 'Al día', vencimiento: isoDate(agregarMeses(todayMidnight(), 1)) };
+      const vencEjemplo = isoDate(agregarMeses(todayMidnight(), 1));
+      cuenta = { ...cuenta, estado: 'Al día', vencimiento: vencEjemplo, inicioPlazo: vencEjemplo.slice(0, 8) + '01', limite: limitePago(vencEjemplo) };
     }
     let cuotaHtml = '';
     let cuotaBanner = '';
+    // La cuota se paga del 1 al día de pago de cada mes. 'mesCuota' es el mes que
+    // le toca pagar; 'conPago' dice si todavía le quedan días de su pago anterior.
+    const mesCuota = cuenta.limite ? MESES[parseInt(cuenta.limite.slice(5, 7), 10) - 1].toLowerCase() : '';
+    const conPago = !!cuenta.vencimiento && cuenta.vencimiento >= isoDate(ahora());
+    const filaPagoHasta = cuenta.vencimiento
+      ? `<div class="kv-row"><span class="k">${conPago ? 'Tenés pago hasta' : 'Tu pago terminó'}</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>` : '';
     if (cuenta.estado === 'Al día') {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-green">Al día</span></span></div>
-                    <div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>`;
+                    ${filaPagoHasta}
+                    <div class="kv-row"><span class="k">Próxima cuota</span><span class="v">del ${formatFechaCorta(cuenta.inicioPlazo)} al ${formatFechaCorta(cuenta.limite)}</span></div>`;
     } else if (cuenta.estado === 'En período de pago') {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-amber">Para pagar</span></span></div>
-                    <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+                    ${filaPagoHasta}
                     <div class="kv-row"><span class="k">Podés pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
-      cuotaBanner = `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Es momento de pagar la cuota</b>Venció el ${formatFechaCorta(cuenta.vencimiento)}. Tenés hasta el ${formatFechaCorta(cuenta.limite)} para pagarla.</div>`;
+      cuotaBanner = `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Es momento de pagar la cuota</b>La cuota de ${mesCuota} se paga del ${formatFechaCorta(cuenta.inicioPlazo)} al ${formatFechaCorta(cuenta.limite)}. Tenés hasta el ${formatFechaCorta(cuenta.limite)} para pagarla: después de ese día no vas a poder reservar turnos.</div>`;
     } else if (cuenta.estado === 'Vencido') {
-      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-red">Vencida</span></span></div>`;
-      cuotaBanner = `<div class="banner"><b>Cuota vencida</b>Tu cuota venció el ${formatFechaCorta(cuenta.vencimiento)} y el plazo para pagarla terminó el ${formatFechaCorta(cuenta.limite)}. Pasá por recepción para regularizarla.</div>`;
+      cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-red">Vencida</span></span></div>
+                    ${filaPagoHasta}
+                    ${conPago ? `<div class="kv-row"><span class="k">Había que pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>` : ''}`;
+      cuotaBanner = `<div class="banner"><b>Cuota vencida</b>${conPago
+        ? `La cuota de ${mesCuota} se pagaba hasta el ${formatFechaCorta(cuenta.limite)} y todavía no la pagaste.`
+        : `Tu último pago cubría hasta el ${formatFechaCorta(cuenta.vencimiento)}.`} Hasta que la pagues no podés reservar turnos: pasá por recepción para regularizarla.</div>`;
     } else {
       cuotaHtml = `<div class="kv-row"><span class="k">Cuota</span><span class="v"><span class="pill pill-amber">Sin pagos</span></span></div>`;
+      cuotaBanner = `<div class="banner" style="border-color:var(--amber); background:rgba(242,169,59,0.1);"><b style="color:var(--amber);">Cuota sin pagar</b>Todavía no tenés ningún pago registrado. Pasá por recepción para pagar tu cuota.</div>`;
     }
+    // Con la membresía pausada o de baja no hay cuota que reclamarle: sin alerta
+    if (bloqueado) cuotaBanner = '';
 
     return `
       <div class="view">
@@ -3714,11 +3795,14 @@
     const usadosSemana = reservasEnSemana(data, cliente.dni, selectedDate).length;
     const limiteSemanalAlcanzado = usadosSemana >= limiteSemanal;
     const limiteDiarioAlcanzado = misDelDia.length >= MAX_TURNOS_POR_DIA;
-    const puedeReservar = !bloqueado && !limiteSemanalAlcanzado && !limiteDiarioAlcanzado;
+    const cuotaVencida = !bloqueado && cuotaImpideReservar(data, cliente.dni);
+    const puedeReservar = !bloqueado && !cuotaVencida && !limiteSemanalAlcanzado && !limiteDiarioAlcanzado;
 
     let estadoHtml = '';
     if (bloqueado) {
       estadoHtml = `<div class="banner" style="margin-top:10px;"><b>Membresía ${cliente.estado.toLowerCase()}</b>No podés reservar hasta regularizar tu membresía.</div>`;
+    } else if (cuotaVencida) {
+      estadoHtml = `<div class="banner" style="margin-top:10px;"><b>Cuota vencida</b>No podés reservar turnos hasta pagar la cuota. Pasá por recepción para regularizarla.</div>`;
     } else if (limiteSemanalAlcanzado) {
       estadoHtml = `<p class="turnos-estado aviso">Ya reservaste tus ${limiteSemanal} turnos de esta semana. Si necesitás uno más, hablalo con tu profe.</p>`;
     } else if (limiteDiarioAlcanzado) {
@@ -4742,6 +4826,15 @@
       showToast('Tu membresía no está activa: no podés reservar.');
       renderApp();
       return;
+    }
+    if (cuotaImpideReservar(state.data, state.cliente.dni)) {
+      // Puede que recién haya pagado en recepción: se vuelve a leer antes de negarle el turno
+      await refreshData();
+      if (cuotaImpideReservar(state.data, state.cliente.dni)) {
+        showToast('Tenés la cuota vencida: no podés reservar hasta pagarla.');
+        renderApp();
+        return;
+      }
     }
     if (turnoYaEmpezo(state.selectedDate, hora)) {
       showToast('Ese turno ya empezó. Elegí uno más tarde.');
