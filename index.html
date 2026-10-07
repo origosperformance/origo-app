@@ -764,6 +764,69 @@
     return fila ? fila.valor : 30000;
   }
 
+  // La matrícula (alta de membresía) se puede apagar desde Planes. Apagada no
+  // aparece en ningún lado de la app. Se guarda en "config" como
+  // 'matricula_activa' = 1; si la fila no existe, se toma como apagada.
+  function matriculaActiva() {
+    const fila = state.data && state.data.config ? state.data.config.find(c => c.clave === 'matricula_activa') : null;
+    return !!fila && Number(fila.valor) === 1;
+  }
+
+  async function guardarMatriculaActiva(activar) {
+    const valor = activar ? 1 : 0;
+    const existe = state.data.config.some(c => c.clave === 'matricula_activa');
+    const { error } = existe
+      ? await sb.from('config').update({ valor }).eq('clave', 'matricula_activa')
+      : await sb.from('config').insert({ clave: 'matricula_activa', valor });
+    if (error) { showToast('No se pudo guardar.'); console.error(error); return; }
+    await refreshData();
+    showToast(activar ? 'La matrícula se vuelve a cobrar' : 'La matrícula dejó de cobrarse');
+    renderApp();
+  }
+
+  // ---------------- Usuario de prueba ----------------
+  // Un cliente marcado como "de prueba" sirve para mostrar la app: entra como
+  // cualquier cliente, pero nunca figura con deuda y no cuenta en los números
+  // del administrador (cuotas, facturación, asistencias, control PRO) ni ocupa
+  // cupo en los turnos. La marca se guarda en la tabla "config" como una fila
+  // 'prueba_<dni>' con valor 1, y se cambia desde Clientes > Editar.
+  const CLAVE_PRUEBA = 'prueba_';
+  function esPrueba(dni) {
+    const cfg = state.data && state.data.config;
+    return !!cfg && cfg.some(c => c.clave === CLAVE_PRUEBA + dni && Number(c.valor) === 1);
+  }
+  function clientesReales(data) { return data.clientes.filter(c => !esPrueba(c.dni)); }
+  function reservasReales(data) { return data.reservas.filter(r => !esPrueba(r.dni)); }
+  function pagosReales(data) { return data.pagos.filter(p => !esPrueba(p.dni)); }
+
+  // Lugares ocupados de un turno. Las reservas de un usuario de prueba no
+  // cuentan, salvo para él mismo (así ve su propio turno descontado).
+  function ocupadosEnTurno(data, fecha, hora, dniQueMira) {
+    return data.reservas.filter(r =>
+      r.fecha === fecha && r.hora === hora && r.estado !== 'cancelado' &&
+      (!esPrueba(r.dni) || r.dni === dniQueMira)).length;
+  }
+
+  // Marca o desmarca a un cliente como usuario de prueba. Devuelve false si falló.
+  async function guardarMarcaPrueba(dni, marcar) {
+    if (marcar === esPrueba(dni)) return true;
+    const clave = CLAVE_PRUEBA + dni;
+    const existe = state.data.config.some(c => c.clave === clave);
+    let res;
+    if (marcar) {
+      res = existe
+        ? await sb.from('config').update({ valor: 1 }).eq('clave', clave)
+        : await sb.from('config').insert({ clave, valor: 1 });
+    } else {
+      // Primero se apaga (valor 0) y después se intenta borrar la fila: si la
+      // base no deja borrar, igual queda desmarcado.
+      res = await sb.from('config').update({ valor: 0 }).eq('clave', clave);
+      if (!res.error) await sb.from('config').delete().eq('clave', clave);
+    }
+    if (res.error) { console.error('No se pudo guardar la marca de usuario de prueba:', res.error); return false; }
+    return true;
+  }
+
   let state = {
     data: null,
     cliente: null,
@@ -779,6 +842,7 @@
     asistenciasFecha: null,
     clienteBusqueda: '',
     rutinasAbiertoDni: null,
+    confirmarEliminarDni: null, // cliente al que se le está preguntando "¿eliminar?"
     reservasTab: 'proximos', // proximos | asistencias
     asistMes: null,          // 'YYYY-MM' que se está mirando en el calendario de asistencias
     proAbierto: undefined,   // tarjeta abierta en "Mi día": 'wellness' | 'tqr' | 'rpe' | null (undefined = elegir sola la pendiente)
@@ -1101,7 +1165,7 @@
         <div class="banner"><b>Falta activar esta sección</b>Todavía no existe la tabla "registros_pro" en Supabase. Hay que crearla una sola vez para que los clientes PRO puedan cargar Wellness, TQR y RPE.</div>`;
     }
 
-    const pros = data.clientes.filter(c => esPro(c) && c.estado !== 'Baja')
+    const pros = clientesReales(data).filter(c => esPro(c) && c.estado !== 'Baja')
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     const controles = `
@@ -1183,12 +1247,19 @@
         <p class="sub">Precios de los planes — se aplican al instante a los clientes nuevos y a los que registren un pago</p>
         ${planesHtml}
         <div class="cuota-card">
-          <div class="cuota-nombre" style="margin-bottom:8px;">Matrícula</div>
+          <div class="cuota-top">
+            <div class="cuota-nombre">Matrícula</div>
+            <span class="pill ${matriculaActiva() ? 'pill-green' : 'pill-amber'}">${matriculaActiva() ? 'Se cobra' : 'No se cobra'}</span>
+          </div>
+          ${matriculaActiva() ? `
           <div class="plan-row">
             <span class="plan-row-dias">Alta de membresía</span>
             <input type="text" inputmode="numeric" class="plan-precio-input" id="matriculaPrecioInput" value="${matricula}">
             <button class="cancel-link" id="guardarMatriculaBtn">Guardar</button>
           </div>
+          <div class="pago-detalle" style="margin-top:8px;">Figura en cada cliente y al cargar uno nuevo. <button class="cancel-link" id="toggleMatriculaBtn" data-activar="0">Dejar de cobrarla</button></div>`
+          : `
+          <div class="pago-detalle">Por ahora no se cobra: no aparece en los clientes, al cargar uno nuevo ni en el resumen. <button class="cancel-link" id="toggleMatriculaBtn" data-activar="1">Volver a cobrarla</button></div>`}
         </div>
         <div class="cuota-card" style="margin-top:10px;">
           <div class="cuota-nombre" style="margin-bottom:8px;">Plazo de pago</div>
@@ -1207,23 +1278,26 @@
 
   // ---------------- Admin: Resumen ----------------
   function renderAdminResumen(data) {
-    const activos = data.clientes.filter(c => c.estado === 'Activo');
-    const pausados = data.clientes.filter(c => c.estado === 'Pausado');
-    const bajas = data.clientes.filter(c => c.estado === 'Baja');
+    // Los usuarios de prueba no cuentan en ningún número del resumen
+    const clientes = clientesReales(data);
+    const reservas = reservasReales(data);
+    const activos = clientes.filter(c => c.estado === 'Activo');
+    const pausados = clientes.filter(c => c.estado === 'Pausado');
+    const bajas = clientes.filter(c => c.estado === 'Baja');
 
     const facturacionProyectada = activos.reduce((sum, c) => sum + (c.precio || 0), 0);
 
-    const cuentasDisplay = data.clientes.map(c => cuotaDisplay(data, c.dni));
+    const cuentasDisplay = clientes.map(c => cuotaDisplay(data, c.dni));
     const vencidos = cuentasDisplay.filter(e => e.estado === 'Vencido').length;
     const sinPagos = cuentasDisplay.filter(e => e.estado === 'Sin pagos').length;
     const vencePronto = cuentasDisplay.filter(e => e.prioridad === 1).length;
 
     const hoy = isoDate(new Date());
-    const turnosHoy = data.reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
-    const asistieronHoy = data.reservas.filter(r => r.fecha === hoy && estadoEfectivo(r) === 'asistio').length;
+    const turnosHoy = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
+    const asistieronHoy = reservas.filter(r => r.fecha === hoy && estadoEfectivo(r) === 'asistio').length;
 
     const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
-    const sinMatricula = data.clientes.filter(c => !(c.matricula && c.matricula.pagada)).length;
+    const sinMatricula = matriculaActiva() ? clientes.filter(c => !(c.matricula && c.matricula.pagada)).length : 0;
 
     // Lista de cosas que requieren una decisión o acción, ordenadas por urgencia
     const itemsAtencion = [
@@ -1295,7 +1369,12 @@
         ? `Asistió ${asist.cantidad} ${asist.cantidad === 1 ? 'vez' : 'veces'} este mes · última: ${formatFechaCorta(asist.ultima)}`
         : 'Sin asistencias este mes';
 
-      const matriculaHtml = (c.matricula && c.matricula.pagada)
+      // Al usuario de prueba no se le reclama la matrícula: se muestra solo la leyenda
+      const matriculaHtml = esPrueba(c.dni)
+        ? `<div class="admin-row-asist" style="color:var(--amber); font-weight:600;">Usuario de prueba · no cuenta en cuotas, asistencias ni facturación</div>`
+        : !matriculaActiva()
+        ? ''
+        : (c.matricula && c.matricula.pagada)
         ? `<div class="admin-row-asist">Matrícula pagada el ${formatFechaCorta(c.matricula.fechaPago)}</div>`
         : `<div class="admin-row-asist" style="color:var(--red);">Matrícula sin pagar ·
              <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(matriculaPrecio())})</button>
@@ -1348,6 +1427,14 @@
           <button class="cancel-link" data-del-dni="${c.dni}">Eliminar</button>
         </div>
       </div>
+      ${state.confirmarEliminarDni === c.dni ? `
+      <div class="banner" style="margin:0;">
+        <b>¿Eliminar a ${esc(c.nombre)}?</b>Se borra el cliente con sus datos de acceso y no se puede deshacer. Si solo dejó de venir, conviene pasarlo a "Baja".
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button class="btn btn-ghost" data-del-no="1" style="flex:1;">Cancelar</button>
+          <button class="btn btn-primary" data-del-si="${c.dni}" style="flex:1; background:var(--red);">Sí, eliminar</button>
+        </div>
+      </div>` : ''}
       ${rutinasPanel}
     `;
     }).join('') || `<div class="empty-state">Ningún cliente coincide con "${state.clienteBusqueda}".</div>`;
@@ -1360,7 +1447,7 @@
             <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
             <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
             <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?editing.nombre:''}"></label>
-            <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email:''}"></label>
+            <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?editing.email||'':''}"></label>
             <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?editing.telefono||'':''}"></label>
             <label>Plan
               <select id="fPlan">
@@ -1393,6 +1480,10 @@
               <input type="number" id="fLimiteSemanal" min="0" max="20" placeholder="Vacío = automático según estímulos contratados"
                 value="${editing&&editing.limiteSemanalOverride!=null?editing.limiteSemanalOverride:''}">
             </label>
+            <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
+              <input type="checkbox" id="fPrueba" style="width:auto;" ${editing&&esPrueba(editing.dni)?'checked':''}>
+              Usuario de prueba (para mostrar la app: nunca figura con deuda ni cuenta en los números)
+            </label>
           </div>
           ${!editing ? `
           <div class="divider"></div>
@@ -1408,10 +1499,11 @@
                 ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
               </select>
             </label>
+            ${matriculaActiva() ? `
             <label class="span2" style="flex-direction:row; align-items:center; gap:8px;">
               <input type="checkbox" id="fMatriculaPagada" style="width:auto;">
               Matrícula pagada (${money(matriculaPrecio())})
-            </label>
+            </label>` : ''}
           </div>
           ` : ''}
           <div class="divider"></div>
@@ -1584,7 +1676,7 @@
       return /[;"\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
     };
     const filas = [['Fecha de pago', 'Cliente', 'DNI', 'Plan actual', 'Duración', 'Monto', 'Método de pago', 'Período desde', 'Período hasta', 'Comprobante']];
-    state.data.pagos.slice()
+    pagosReales(state.data)
       .sort((a, b) => (a.fechaPago + a.id).localeCompare(b.fechaPago + b.id))
       .forEach(p => {
         const c = state.data.clientes.find(x => x.dni === p.dni);
@@ -1710,9 +1802,11 @@
         </div>`;
     };
 
-    const urgentes = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 0);
-    const proximos = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 1);
-    const alDia = data.clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 2);
+    // Los usuarios de prueba no aparecen acá ni suman en lo cobrado
+    const clientes = clientesReales(data);
+    const urgentes = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 0);
+    const proximos = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 1);
+    const alDia = clientes.filter(c => cuotaDisplay(data, c.dni).prioridad === 2);
 
     const seccion = (titulo, lista) => lista.length
       ? `<h2 style="font-size:15px; margin-top:20px;">${titulo} (${lista.length})</h2><div class="cuota-list">${lista.map(card).join('')}</div>`
@@ -1729,7 +1823,7 @@
 
     // Cobrado en el mes en curso
     const mesHoy = isoDate(new Date()).slice(0, 7);
-    const pagosMes = data.pagos.filter(p => p.fechaPago.slice(0, 7) === mesHoy);
+    const pagosMes = pagosReales(data).filter(p => p.fechaPago.slice(0, 7) === mesHoy);
     const cobradoMes = pagosMes.reduce((sum, p) => sum + (p.monto || 0), 0);
 
     return `
@@ -1751,7 +1845,7 @@
     const hoy = isoDate(new Date());
     const esFuturo = fecha > hoy;
 
-    const turnosDelDia = data.reservas.filter(r => r.fecha === fecha && r.estado !== 'cancelado');
+    const turnosDelDia = reservasReales(data).filter(r => r.fecha === fecha && r.estado !== 'cancelado');
 
     const agruparPorHora = (lista) => {
       const map = {};
@@ -1867,7 +1961,12 @@
         </div>`;
     }
 
-    const cuenta = estadoCuenta(data, cliente.dni);
+    let cuenta = estadoCuenta(data, cliente.dni);
+    // Usuario de prueba: siempre se muestra al día. Si no tiene un pago vigente,
+    // se le muestra un vencimiento de ejemplo (dentro de un mes).
+    if (esPrueba(cliente.dni) && cuenta.estado !== 'Al día') {
+      cuenta = { ...cuenta, estado: 'Al día', vencimiento: isoDate(agregarMeses(todayMidnight(), 1)) };
+    }
     let cuotaHtml = '';
     let cuotaBanner = '';
     if (cuenta.estado === 'Al día') {
@@ -2192,7 +2291,7 @@
     const quedanOtrosDias = dates.some(d => isoDate(d) > selectedDate);
 
     const slots = horariosVisibles.map(hora => {
-      const ocupados = data.reservas.filter(r => r.fecha === selectedDate && r.hora === hora && r.estado !== 'cancelado').length;
+      const ocupados = ocupadosEnTurno(data, selectedDate, hora, cliente.dni);
       const disponibles = CUPO - ocupados;
       const miReserva = misReservasHoy.find(r => r.hora === hora);
       let btn;
@@ -2443,6 +2542,7 @@
       root.querySelectorAll('[data-admin-tab]').forEach(btn => {
         btn.onclick = () => {
           state.adminTab = btn.dataset.adminTab;
+          state.confirmarEliminarDni = null;
           renderApp();
         };
       });
@@ -2450,12 +2550,22 @@
       const tabActiva = root.querySelector('.admin-tab.active');
       if (tabActiva) tabActiva.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
-      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; state.editingDni = null; renderApp(); };
+      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; state.editingDni = null; state.confirmarEliminarDni = null; renderApp(); };
 
       if (state.adminTab === 'clientes') {
         wireAdminForm();
+        // "Eliminar" solo abre la pregunta; recién "Sí, eliminar" borra
         root.querySelectorAll('[data-del-dni]').forEach(btn => {
-          btn.onclick = () => eliminarCliente(btn.dataset.delDni);
+          btn.onclick = () => {
+            state.confirmarEliminarDni = state.confirmarEliminarDni === btn.dataset.delDni ? null : btn.dataset.delDni;
+            renderApp();
+          };
+        });
+        root.querySelectorAll('[data-del-si]').forEach(btn => {
+          btn.onclick = () => { btn.disabled = true; eliminarCliente(btn.dataset.delSi); };
+        });
+        root.querySelectorAll('[data-del-no]').forEach(btn => {
+          btn.onclick = () => { state.confirmarEliminarDni = null; renderApp(); };
         });
         root.querySelectorAll('[data-estado-dni]').forEach(sel => {
           sel.onchange = () => cambiarEstadoCliente(sel.dataset.estadoDni, sel.value);
@@ -2485,6 +2595,7 @@
         root.querySelectorAll('[data-edit-dni]').forEach(btn => {
           btn.onclick = () => {
             state.editingDni = btn.dataset.editDni;
+            state.confirmarEliminarDni = null;
             state.adminFormError = ''; state.adminFormNotice = '';
             renderApp();
           };
@@ -2567,6 +2678,8 @@
         });
         const diasBtn = document.getElementById('guardarDiasParaPagarBtn');
         if (diasBtn) diasBtn.onclick = () => guardarDiasParaPagar(document.getElementById('diasParaPagarInput').value);
+        const toggleMatriculaBtn = document.getElementById('toggleMatriculaBtn');
+        if (toggleMatriculaBtn) toggleMatriculaBtn.onclick = () => guardarMatriculaActiva(toggleMatriculaBtn.dataset.activar === '1');
         const matriculaBtn = document.getElementById('guardarMatriculaBtn');
         if (matriculaBtn) {
           matriculaBtn.onclick = () => {
@@ -2832,6 +2945,10 @@
     const estado = document.getElementById('fEstado').value;
     const limiteRaw = document.getElementById('fLimiteSemanal').value.trim();
     const limiteSemanalOverride = limiteRaw === '' ? null : parseInt(limiteRaw, 10);
+    const marcarPrueba = document.getElementById('fPrueba').checked;
+    const notaPrueba = (okMarca) => !okMarca
+      ? ' Ojo: no se pudo guardar la marca de usuario de prueba, probá de nuevo.'
+      : (marcarPrueba ? ' Quedó como usuario de prueba.' : '');
 
     if (!dni || !nombre || (!state.editingDni && !password)) {
       state.adminFormError = state.editingDni
@@ -2859,10 +2976,16 @@
       const nota = aplicarTransicionEstado(candidato, estadoAnterior, estado);
       const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', state.editingDni);
       if (error) { state.adminFormError = 'No se pudo guardar (' + error.message + ')'; renderApp(); return; }
+      const dniEditado = state.editingDni;
+      const eraPrueba = esPrueba(dniEditado);
+      await guardarMarcaPrueba(dniEditado, marcarPrueba);
       await refreshData();
+      // Se confirma contra lo que realmente quedó guardado en la base
+      const okMarca = esPrueba(dniEditado) === marcarPrueba;
       state.editingDni = null;
       state.adminFormError = '';
-      state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}`;
+      state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}${
+        !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}`;
       renderApp();
       return;
     }
@@ -2873,7 +2996,9 @@
       renderApp();
       return;
     }
-    const matriculaPagada = document.getElementById('fMatriculaPagada').checked;
+    // La casilla solo existe si la matrícula se está cobrando
+    const casillaMatricula = document.getElementById('fMatriculaPagada');
+    const matriculaPagada = !!casillaMatricula && casillaMatricula.checked;
     const passwordHash = await hashPassword(password);
     const nuevoCliente = {
       dni, ...datosComunes, password: passwordHash,
@@ -2902,9 +3027,10 @@
       if (!errPago) notaPago = ` Pago inicial registrado (${dur.label}, vence ${formatFechaCorta(isoDate(venc))}).`;
     }
 
+    if (marcarPrueba) await guardarMarcaPrueba(dni, true);
     await refreshData();
     state.adminFormError = '';
-    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}`;
+    state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}`;
     renderApp();
   }
 
@@ -2937,10 +3063,16 @@
   }
 
   async function eliminarCliente(dni) {
+    state.confirmarEliminarDni = null;
     const { error } = await sb.from('clientes').delete().eq('dni', dni);
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
     // Sus registros de control diario se borran con él (si la tabla existe)
     if (state.data.registrosProListo) await sb.from('registros_pro').delete().eq('dni', dni);
+    // Y su marca de usuario de prueba, para que no la herede otro cliente con el mismo DNI
+    if (state.data.config.some(c => c.clave === CLAVE_PRUEBA + dni)) {
+      await sb.from('config').update({ valor: 0 }).eq('clave', CLAVE_PRUEBA + dni);
+      await sb.from('config').delete().eq('clave', CLAVE_PRUEBA + dni);
+    }
     await refreshData();
     showToast('Cliente eliminado');
     renderApp();
@@ -2949,8 +3081,9 @@
   function aplicarTransicionEstado(c, estadoAnterior, nuevoEstado) {
     if (nuevoEstado === estadoAnterior) return '';
     if (nuevoEstado === 'Baja') {
-      c.matricula = { pagada: false, fechaPago: null };
       c.pausadoDesde = null;
+      if (!matriculaActiva()) return '';
+      c.matricula = { pagada: false, fechaPago: null };
       return ' Se reinició su matrícula: va a tener que pagarla de nuevo si vuelve.';
     }
     if (nuevoEstado === 'Pausado') {
@@ -3023,7 +3156,22 @@
     return Math.round((hoy - desde) / 86400000);
   }
 
+  // Reservas de un día leídas en ese momento desde la base (null si no se pudo leer)
+  async function reservasFrescasDelDia(fecha) {
+    const { data, error } = await sb.from('reservas').select('*').eq('fecha', fecha);
+    if (error || !data) { console.error('No se pudo leer el cupo:', error); return null; }
+    return data;
+  }
+
+  // Evita que dos toques seguidos en "Reservar" anoten dos veces
+  let reservaEnCurso = false;
   async function reservarTurno(hora) {
+    if (reservaEnCurso) return;
+    reservaEnCurso = true;
+    try { await reservarTurnoInterno(hora); } finally { reservaEnCurso = false; }
+  }
+
+  async function reservarTurnoInterno(hora) {
     if (turnoYaEmpezo(state.selectedDate, hora)) {
       showToast('Ese turno ya empezó. Elegí uno más tarde.');
       renderApp();
@@ -3041,15 +3189,46 @@
       showToast('Ya alcanzaste tu límite semanal de turnos según tu plan.');
       return;
     }
+    // El cupo se vuelve a consultar en la base en este momento: lo que el
+    // cliente ve en pantalla puede tener varios minutos.
+    const dni = state.cliente.dni;
+    const fecha = state.selectedDate;
+    const antes = await reservasFrescasDelDia(fecha);
+    if (!antes) { showToast('No se pudo comprobar el cupo. Probá de nuevo.'); return; }
+    if (antes.some(r => r.dni === dni && r.hora === hora && r.estado !== 'cancelado')) {
+      await refreshData();
+      showToast('Ya tenías reservado ese turno.');
+      renderApp();
+      return;
+    }
+    if (ocupadosEnTurno({ reservas: antes }, fecha, hora, dni) >= CUPO) {
+      await refreshData();
+      showToast('Ese turno se acaba de completar. Elegí otro horario.');
+      renderApp();
+      return;
+    }
     const nueva = {
       id: 'r' + Date.now() + Math.random().toString(36).slice(2,7),
-      dni: state.cliente.dni,
-      fecha: state.selectedDate,
+      dni,
+      fecha,
       hora,
       estado: 'reservado',
     };
     const { error } = await sb.from('reservas').insert(nueva);
     if (error) { showToast('No se pudo reservar. Probá de nuevo.'); console.error(error); return; }
+    // Segundo control: si otro cliente anotó en el mismo instante y el turno
+    // quedó pasado de cupo, esta reserva se deshace. (El usuario de prueba no
+    // ocupa lugar, así que no puede pasarse.)
+    if (!esPrueba(dni)) {
+      const despues = await reservasFrescasDelDia(fecha);
+      if (despues && ocupadosEnTurno({ reservas: despues }, fecha, hora, dni) > CUPO) {
+        await sb.from('reservas').update({ estado: 'cancelado' }).eq('id', nueva.id);
+        await refreshData();
+        showToast('Ese turno se completó justo antes. Elegí otro horario.');
+        renderApp();
+        return;
+      }
+    }
     await refreshData();
     showToast('Turno reservado: ' + hora + ' hs');
     renderApp();
