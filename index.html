@@ -178,7 +178,10 @@
   .cuota-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .cuota-nombre { font-size: 14px; font-weight: 600; }
   .pago-detalle { font-size: 12px; color: var(--text-muted); }
-  .pago-registrar { display: flex; gap: 8px; margin-top: 10px; }
+  .pago-registrar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .pago-registrar .duracion-select { flex: 1 1 100%; }
+  .pago-monto { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+  .pago-monto b { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 22px; font-weight: 600; color: var(--text); }
   input[type=text].pago-nota-input {
     width: 100%; margin-top: 8px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
     padding: 9px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit; outline: none;
@@ -206,8 +209,8 @@
     padding: 8px 10px; border-radius: var(--radius); font-size: 13px; font-family: inherit; text-align: right;
   }
   .metodo-select, .duracion-select {
-    flex: 1; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
-    padding: 8px 8px; border-radius: var(--radius); font-size: 12px; font-family: inherit;
+    flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+    padding: 9px 8px; border-radius: var(--radius); font-size: 13px; font-family: inherit;
   }
 
   /* ---------- Asistencias ---------- */
@@ -773,9 +776,78 @@
     { id: '6m',  label: '6 meses', tipo: 'meses', valor: 6,  factor: 6 },
   ];
 
-  // Calcula la fecha de vencimiento según el tipo de duración (días corridos
-  // o meses de calendario reales) a partir de una fecha base.
+  // ---- Pagos "hasta fin de mes": sirven para que todos queden venciendo el día 1 ----
+  // Cubren desde la fecha base hasta el día 1 del mes siguiente. Se cobran por
+  // semanas: cada semana vale un cuarto de la cuota, redondeado a REDONDEO_SEMANAS.
+  // Para cambiar el redondeo o el valor de una semana alcanza con tocar acá.
+  const REDONDEO_SEMANAS = 500;
+  const DURACIONES_FIN_DE_MES = [
+    { id: 'fm-mes', label: 'Mes en curso (cuota completa)', corto: 'Mes en curso', tipo: 'finmes', semanas: 4, factor: 1 },
+    { id: 'fm-3s',  label: '3 semanas hasta fin de mes',    corto: '3 semanas',    tipo: 'finmes', semanas: 3, factor: 0.75 },
+    { id: 'fm-2s',  label: '2 semanas hasta fin de mes',    corto: '2 semanas',    tipo: 'finmes', semanas: 2, factor: 0.5 },
+    { id: 'fm-1s',  label: '1 semana hasta fin de mes',     corto: '1 semana',     tipo: 'finmes', semanas: 1, factor: 0.25 },
+  ];
+
+  function duracionPorId(id) {
+    return DURACIONES.find(d => d.id === id) || DURACIONES_FIN_DE_MES.find(d => d.id === id) || null;
+  }
+
+  // Cuánto se cobra por una duración, según la cuota mensual del cliente
+  function montoDe(precio, dur) {
+    const bruto = (precio || 0) * dur.factor;
+    if (dur.tipo === 'finmes' && dur.factor < 1) return Math.round(bruto / REDONDEO_SEMANAS) * REDONDEO_SEMANAS;
+    return Math.round(bruto);
+  }
+
+  function primerDiaMesSiguiente(fecha) {
+    return new Date(fecha.getFullYear(), fecha.getMonth() + 1, 1);
+  }
+
+  function diasHastaFinDeMes(base) {
+    return Math.round((primerDiaMesSiguiente(base) - base) / 86400000);
+  }
+
+  // Qué pago "hasta fin de mes" corresponde si el período arranca en 'base':
+  //  - si arranca un día 1 ya está ordenado: null (va el pago común de 1 mes)
+  //  - dentro del plazo de pago (del 1 al 10): la cuota completa
+  //  - después: 3, 2 o 1 semanas según lo que falte para fin de mes
+  function sugerenciaFinDeMes(base) {
+    if (base.getDate() === 1) return null;
+    if (base.getDate() <= diasParaPagar()) return 'fm-mes';
+    const semanas = Math.min(3, Math.max(1, Math.round(diasHastaFinDeMes(base) / 7)));
+    return 'fm-' + semanas + 's';
+  }
+
+  // Opciones del desplegable de duración. 'precio' null = no mostrar montos.
+  function opcionesDuracionHtml(base, precio) {
+    const sugerida = sugerenciaFinDeMes(base);
+    const conPrecio = precio !== null && precio !== undefined;
+    const opcion = (d, elegida, extra) =>
+      `<option value="${d.id}" ${elegida ? 'selected' : ''}>${d.label}${conPrecio ? ' — ' + money(montoDe(precio, d)) : ''}${extra || ''}</option>`;
+    const comunes = DURACIONES.map(d => opcion(d, !sugerida && d.id === '1m')).join('');
+    if (!sugerida) return comunes;
+    const dias = diasHastaFinDeMes(base);
+    // Solo las semanas que tienen sentido para lo que falta del mes
+    const finDeMes = DURACIONES_FIN_DE_MES
+      .filter(d => d.id === sugerida || (d.id === 'fm-mes' ? dias > 21 : (d.semanas - 1) * 7 < dias))
+      .map(d => opcion(d, d.id === sugerida, d.id === sugerida ? ' · sugerido' : '')).join('');
+    return `<optgroup label="Para quedar venciendo el día 1">${finDeMes}</optgroup><optgroup label="Otros períodos">${comunes}</optgroup>`;
+  }
+
+  // Texto que explica qué cubre un pago antes de registrarlo
+  function textoPeriodoPago(base, venc, dur) {
+    if (dur && dur.tipo === 'finmes') {
+      const dias = Math.round((venc - base) / 86400000);
+      return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes (' + dias + (dias === 1 ? ' día' : ' días') + '). '
+        + 'La cuota siguiente vence el ' + formatFechaCorta(isoDate(venc)) + ' y se paga hasta el ' + formatFechaCorta(limitePago(isoDate(venc))) + '.';
+    }
+    return 'Este pago cubre del ' + formatFechaCorta(isoDate(base)) + ' al ' + formatFechaCorta(isoDate(venc)) + '.';
+  }
+
+  // Calcula la fecha de vencimiento según el tipo de duración (días corridos,
+  // meses de calendario reales o hasta fin de mes) a partir de una fecha base.
   function calcularVencimiento(fechaBase, dur) {
+    if (dur.tipo === 'finmes') return primerDiaMesSiguiente(new Date(fechaBase));
     if (dur.tipo === 'meses') return agregarMeses(fechaBase, dur.valor);
     const v = new Date(fechaBase);
     v.setDate(v.getDate() + dur.valor);
@@ -1569,7 +1641,7 @@
             <label>Pago inicial
               <select id="fDuracionPago">
                 <option value="">Sin pago inicial (registrar después)</option>
-                ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label}</option>`).join('')}
+                ${opcionesDuracionHtml(todayMidnight(), null)}
               </select>
             </label>
             <label>Método de pago
@@ -1586,6 +1658,8 @@
           ` : ''}
           <div class="divider"></div>
           <div class="kv-row"><span class="k">Cuota calculada</span><span class="v" id="fPrecioPreview">—</span></div>
+          ${!editing ? `<div class="kv-row"><span class="k">Pago inicial</span><span class="v" id="fPagoInicialMonto">—</span></div>
+          <div class="pago-detalle" id="fPagoInicialDetalle" style="margin-bottom:6px;"></div>` : ''}
           <div class="error-text">${formError || ''}</div>
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn btn-primary" id="addClienteBtn" style="flex:1;">${editing ? 'Guardar cambios' : 'Agregar cliente'}</button>
@@ -2008,7 +2082,10 @@
         const dni = sel.dataset.duracionDni;
         const previo = periodoNuevoPago(state.data, dni, sel.value);
         const el = document.querySelector(`[data-preview-dni="${dni}"]`);
-        if (el) el.textContent = 'Este pago cubre del ' + formatFechaCorta(isoDate(previo.base)) + ' al ' + formatFechaCorta(isoDate(previo.venc)) + '.';
+        if (el) el.textContent = textoPeriodoPago(previo.base, previo.venc, previo.dur);
+        const cliente = state.data.clientes.find(c => c.dni === dni);
+        const montoEl = document.querySelector(`[data-monto-dni="${dni}"]`);
+        if (montoEl && cliente) montoEl.textContent = money(montoDe(cliente.precio, previo.dur));
       };
     });
     root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
@@ -2100,7 +2177,7 @@
   }
 
   function periodoNuevoPago(data, dni, duracionId) {
-    const dur = DURACIONES.find(d => d.id === duracionId);
+    const dur = duracionPorId(duracionId);
     const base = baseProximoPago(data, dni);
     const venc = calcularVencimiento(base, dur);
     return { dur, base, venc };
@@ -2118,10 +2195,10 @@
 
   async function registrarNuevoPago(dni, duracionId, metodoPago, comprobante) {
     const cliente = state.data.clientes.find(c => c.dni === dni);
-    if (!DURACIONES.find(d => d.id === duracionId) || !cliente) return;
+    if (!duracionPorId(duracionId) || !cliente) return;
     const { dur, base, venc } = periodoNuevoPago(state.data, dni, duracionId);
     const diasReales = Math.round((venc - base) / 86400000);
-    const monto = Math.round((cliente.precio || 0) * dur.factor);
+    const monto = montoDe(cliente.precio, dur);
     const nota = String(comprobante || '').trim().slice(0, 80);
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
@@ -2138,7 +2215,7 @@
       error = reintento.error;
       comprobanteNoGuardado = !reintento.error;
     }
-    if (error) { showToast('No se pudo registrar el pago.'); console.error(error); return; }
+    if (error) { showToast('No se pudo registrar el pago' + (error.message ? ': ' + error.message : '.')); console.error(error); return; }
     await refreshData();
     showToast(comprobanteNoGuardado
       ? 'Pago registrado. El comprobante no se pudo guardar.'
@@ -2174,7 +2251,7 @@
       .sort((a, b) => (a.fechaPago + a.id).localeCompare(b.fechaPago + b.id))
       .forEach(p => {
         const c = state.data.clientes.find(x => x.dni === p.dni);
-        const dur = DURACIONES.find(d => d.id === p.duracionId);
+        const dur = duracionPorId(p.duracionId);
         filas.push([
           formatFecha(p.fechaPago), c ? c.nombre : '(cliente eliminado)', p.dni, c ? c.plan : '',
           dur ? dur.label : (p.duracionId || ''), p.monto, p.metodoPago || '',
@@ -2197,7 +2274,7 @@
   // Lista de pagos de un cliente (se usa en Cuotas del administrador y en el perfil del cliente)
   function filasHistorialPagos(pagos, conDeshacer) {
     return pagos.map((p, i) => {
-      const dur = DURACIONES.find(d => d.id === p.duracionId);
+      const dur = duracionPorId(p.duracionId);
       return `
         <div class="pago-fila">
           <div>
@@ -2262,19 +2339,49 @@
 
   // Controles para registrar un pago de un cliente (pestaña Cuotas y ficha del cliente)
   function formRegistrarPagoHtml(data, c) {
-    const previo = periodoNuevoPago(data, c.dni, '1m');
+    // Si el período no arranca un día 1, queda elegido el pago que lo ordena
+    const base = baseProximoPago(data, c.dni);
+    const previo = periodoNuevoPago(data, c.dni, sugerenciaFinDeMes(base) || '1m');
     return `
           <div class="pago-registrar">
             <select class="duracion-select" data-duracion-dni="${c.dni}">
-              ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label} — ${money(Math.round((c.precio || 0)*d.factor))}</option>`).join('')}
+              ${opcionesDuracionHtml(base, c.precio || 0)}
             </select>
             <select class="metodo-select" data-metodo-dni="${c.dni}">
               ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
             </select>
           </div>
           <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
-          <div class="pago-preview" data-preview-dni="${c.dni}">Este pago cubre del ${formatFechaCorta(isoDate(previo.base))} al ${formatFechaCorta(isoDate(previo.venc))}.</div>
+          <div class="pago-monto"><span>A cobrar</span><b data-monto-dni="${c.dni}">${money(montoDe(c.precio, previo.dur))}</b></div>
+          <div class="pago-preview" data-preview-dni="${c.dni}" style="margin-top:2px;">${textoPeriodoPago(previo.base, previo.venc, previo.dur)}</div>
           <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>`;
+  }
+
+  // Cómo viene la cobranza del mes en curso: un activo "tiene el mes pago"
+  // cuando su cuota llega hasta el día 1 del mes siguiente. No cuenta
+  // pausados, bajas ni usuarios de prueba.
+  function cobranzaDelMes(data) {
+    const hoy = todayMidnight();
+    const finDeMesIso = isoDate(primerDiaMesSiguiente(hoy));
+    const activos = clientesReales(data).filter(c => c.estado === 'Activo');
+    const faltan = [];
+    activos.forEach(c => {
+      const ultimo = ultimoPagoDe(data, c.dni);
+      if (ultimo && ultimo.fechaVencimiento >= finDeMesIso) return;
+      // El próximo pago que le corresponde
+      const base = baseProximoPago(data, c.dni);
+      const dur = duracionPorId(sugerenciaFinDeMes(base) || '1m');
+      faltan.push({ c, dur, monto: montoDe(c.precio, dur), hasta: ultimo ? ultimo.fechaVencimiento : null });
+    });
+    const limiteIso = isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), diasParaPagar()));
+    return {
+      total: activos.length,
+      pagaron: activos.length - faltan.length,
+      faltan,
+      faltaCobrar: faltan.reduce((sum, f) => sum + f.monto, 0),
+      limiteIso,
+      plazoCerrado: isoDate(hoy) > limiteIso,
+    };
   }
 
   function renderAdminCuotas(data) {
@@ -2325,11 +2432,38 @@
     const pagosMes = pagosReales(data).filter(p => p.fechaPago.slice(0, 7) === mesHoy);
     const cobradoMes = pagosMes.reduce((sum, p) => sum + (p.monto || 0), 0);
 
+    const nombreMes = MESES[new Date().getMonth()].toLowerCase();
+    const cob = cobranzaDelMes(data);
+    const cobPill = cob.total === 0 ? ''
+      : cob.faltan.length === 0 ? '<span class="pill pill-green">Todo liquidado</span>'
+      : cob.plazoCerrado ? `<span class="pill pill-red">El plazo cerró el ${formatFechaCorta(cob.limiteIso)}</span>`
+      : `<span class="pill pill-amber">Plazo: hasta el ${formatFechaCorta(cob.limiteIso)}</span>`;
+    const faltanHtml = cob.faltan.length ? `
+          <details class="pago-hist" style="margin-top:6px;">
+            <summary>Ver quiénes faltan (${cob.faltan.length})</summary>
+            ${cob.faltan.slice().sort((a, b) => a.c.nombre.localeCompare(b.c.nombre, 'es')).map(f => `
+            <div class="pago-fila">
+              <div>
+                <button class="nombre-link p1" data-ficha-dni="${f.c.dni}">${esc(f.c.nombre)}</button>
+                <div class="p2">${f.hasta ? 'Tiene pago hasta el ' + formatFechaCorta(f.hasta) : 'Sin pagos'} · le corresponde: ${f.dur.corto || f.dur.label}</div>
+              </div>
+              <span class="monto">${money(f.monto)}</span>
+            </div>`).join('')}
+          </details>` : '';
+
     return `
         <p class="sub">Estado de cuentas${vencidos ? ' — ' + vencidos + ' necesitan atención' : ''}</p>
-        <div class="profile-card" style="margin-bottom:12px; padding:8px 16px;">
-          <div class="kv-row"><span class="k">Cobrado en ${MESES[new Date().getMonth()].toLowerCase()}</span><span class="v">${money(cobradoMes)}</span></div>
+        <div class="cuota-card" style="margin-bottom:12px;">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Cobranza de ${nombreMes}</div>
+            ${cobPill}
+          </div>
+          <div class="asis-semana-top" style="margin-top:10px;"><span>Activos con el mes pago</span><span>${cob.pagaron} de ${cob.total}</span></div>
+          <div class="asis-bar" style="margin-bottom:10px;"><i style="width:${cob.total ? Math.round(cob.pagaron / cob.total * 100) : 0}%"></i></div>
+          <div class="kv-row"><span class="k">Cobrado en ${nombreMes}</span><span class="v">${money(cobradoMes)}</span></div>
+          <div class="kv-row"><span class="k">Falta cobrar (aprox.)</span><span class="v">${money(cob.faltaCobrar)}</span></div>
           <div class="kv-row"><span class="k">Pagos registrados este mes</span><span class="v">${pagosMes.length}</span></div>
+          ${faltanHtml}
         </div>
         <button class="btn btn-ghost" id="exportPagosBtn" style="width:100%;">Descargar historial de pagos (Excel)</button>
         ${seccion('Necesitan atención', urgentes)}
@@ -3377,9 +3511,26 @@
       const dias = esPro ? null : parseInt(diasSel.value, 10);
       const precio = precioDe(planSel.value, dias);
       preview.textContent = precio ? money(precio) + ' / mes' : 'Combinación no válida';
+      // Monto y período del pago inicial (solo en el alta)
+      const durSel = document.getElementById('fDuracionPago');
+      const montoEl = document.getElementById('fPagoInicialMonto');
+      const detalleEl = document.getElementById('fPagoInicialDetalle');
+      if (durSel && montoEl && detalleEl) {
+        const dur = durSel.value ? duracionPorId(durSel.value) : null;
+        if (!dur || !precio) {
+          montoEl.textContent = dur ? '—' : 'Sin pago';
+          detalleEl.textContent = '';
+        } else {
+          const hoy = todayMidnight();
+          montoEl.textContent = money(montoDe(precio, dur));
+          detalleEl.textContent = textoPeriodoPago(hoy, calcularVencimiento(hoy, dur), dur);
+        }
+      }
     };
     planSel.onchange = updatePreview;
     diasSel.onchange = updatePreview;
+    const durPagoSel = document.getElementById('fDuracionPago');
+    if (durPagoSel) durPagoSel.onchange = updatePreview;
     updatePreview();
     document.getElementById('addClienteBtn').onclick = onAddCliente;
   }
@@ -3465,20 +3616,23 @@
     let notaPago = '';
     const duracionPago = document.getElementById('fDuracionPago').value;
     if (duracionPago) {
-      const dur = DURACIONES.find(d => d.id === duracionPago);
+      const dur = duracionPorId(duracionPago);
       const metodoPago = document.getElementById('fMetodoPago').value;
       const hoy = new Date();
       hoy.setHours(0, 0, 0, 0);
       const venc = calcularVencimiento(hoy, dur);
       const diasReales = Math.round((venc - hoy) / 86400000);
-      const monto = Math.round((precio || 0) * dur.factor);
+      const monto = montoDe(precio, dur);
       const nuevoPago = {
         id: 'pago-' + dni + '-' + Date.now(),
         dni, fechaPago: isoDate(hoy), duracionId: dur.id, dias: diasReales, monto, metodoPago,
         fechaVencimiento: isoDate(venc),
       };
       const { error: errPago } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
-      if (!errPago) notaPago = ` Pago inicial registrado (${dur.label}, vence ${formatFechaCorta(isoDate(venc))}).`;
+      notaPago = errPago
+        ? ' Ojo: el pago inicial no se pudo registrar, cargalo desde su ficha.'
+        : ` Pago inicial registrado (${dur.label}, ${money(monto)}, vence ${formatFechaCorta(isoDate(venc))}).`;
+      if (errPago) console.error(errPago);
     }
 
     if (marcarPrueba) await guardarMarcaPrueba(dni, true);
