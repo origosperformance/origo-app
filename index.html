@@ -545,6 +545,59 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+  /* ---------- Admin: lista de clientes y ficha ---------- */
+  .cli-list { display: flex; flex-direction: column; gap: 8px; }
+  .cli-card {
+    display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 10px 12px 14px; font-family: 'Inter', sans-serif; color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cli-card:hover { border-color: var(--green); }
+  .cli-card.baja { opacity: 0.6; }
+  .cli-avatar {
+    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2);
+    border: 1px solid var(--line); display: flex; align-items: center; justify-content: center;
+    font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 15px; font-weight: 600; color: var(--text-muted);
+  }
+  .cli-avatar.grande { width: 56px; height: 56px; font-size: 21px; color: var(--text); }
+  .cli-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .cli-nombre { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cli-meta { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+  .cli-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .cli-chevron { flex: 0 0 auto; color: var(--text-muted); display: flex; }
+  .cli-chevron svg { width: 18px; height: 18px; }
+  .ficha-head { display: flex; align-items: center; gap: 14px; margin: 16px 0 12px; }
+  .ficha-head-info { min-width: 0; }
+  .ficha-nombre { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 24px; font-weight: 600; line-height: 1.15; overflow-wrap: anywhere; }
+  .ficha-contacto a { color: var(--green); text-decoration: none; }
+  .ficha-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  /* Flechita para que se note que el estado se puede cambiar */
+  .ficha-estado .estado-select {
+    padding-right: 26px; background-repeat: no-repeat; background-position: right 10px center; background-size: 9px 6px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2393A19C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  .ficha-tabs { overflow-x: auto; }
+  .ficha-tabs .seg-btn { flex: 1 1 auto; font-size: 12px; padding: 10px 7px; white-space: nowrap; }
+  .ficha-card { margin-bottom: 12px; }
+  .ficha-card .kv-row { padding: 6px 0; font-size: 13px; }
+  .ficha-card .kv-row .v { max-width: 68%; }
+  .ficha .asis-stat .num small { font-size: 15px; font-weight: 500; color: var(--text-muted); margin-left: 1px; }
+  .rutina-adm { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+  .rutina-adm-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .rutina-adm-top .rutina-card-titulo, .rutina-adm-top .rutina-card-fecha { overflow-wrap: anywhere; }
+  .rutina-abrir { flex: 0 0 auto; text-decoration: none; padding: 10px 18px; font-size: 14px; }
+  .rutina-adm-acciones {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    margin-top: 10px; font-size: 12px; color: var(--text-muted); min-height: 22px;
+  }
+  .ficha .rutina-add-form input { background: var(--surface-2); padding: 11px 10px; font-size: 14px; }
+  .nombre-link {
+    background: none; border: none; padding: 0; color: var(--text); font-family: inherit; cursor: pointer;
+    text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 4px;
+  }
+  .nombre-link.pro-admin-nombre { display: block; }
+
   ::-webkit-scrollbar { height: 0; width: 0; }
 </style>
 </head>
@@ -838,10 +891,16 @@
     adminFormError: '',
     adminFormNotice: '',
     adminTab: 'resumen', // resumen | clientes | cuotas | asistencias
-    editingDni: null,      // dni del cliente en edición, null = alta nueva
+    editingDni: null,      // dni del cliente en edición (pestaña Editar de la ficha), null = alta nueva
+    fichaDni: null,        // cliente cuya ficha está abierta en administración
+    fichaTab: 'resumen',   // resumen | pagos | asistencias | rutinas | editar
+    fichaMes: null,        // 'YYYY-MM' del calendario de asistencias de la ficha
+    fichaOrigen: 'clientes', // pestaña desde la que se abrió la ficha (para volver ahí)
+    listaScrollY: 0,       // dónde estaba la lista al abrir la ficha
+    nuevoClienteAbierto: false,
+    confirmarRutinaId: null,
     asistenciasFecha: null,
     clienteBusqueda: '',
-    rutinasAbiertoDni: null,
     confirmarEliminarDni: null, // cliente al que se le está preguntando "¿eliminar?"
     reservasTab: 'proximos', // proximos | asistencias
     asistMes: null,          // 'YYYY-MM' que se está mirando en el calendario de asistencias
@@ -1044,6 +1103,10 @@
       (rutinasPorDni[r.dni] = rutinasPorDni[r.dni] || []).push({ id: r.id, titulo: r.titulo, url: r.url, fecha: r.fecha });
     });
 
+    // Más nueva primero, tanto para el cliente como para administración
+    Object.values(rutinasPorDni).forEach(lista => lista.sort((a, b) =>
+      String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.id).localeCompare(String(a.id))));
+
     state.data = {
       clientes: clientesRes.data.map(row => clienteDbToJs(row, rutinasPorDni)),
       reservas: reservasRes.data.map(r => ({ id: r.id, dni: r.dni, fecha: r.fecha, hora: r.hora, estado: r.estado })),
@@ -1194,7 +1257,7 @@
       }).join('');
       return `
         <div class="pro-admin-card">
-          <div class="pro-admin-nombre">${c.nombre}</div>
+          <button class="nombre-link pro-admin-nombre" data-ficha-dni="${c.dni}">${c.nombre}</button>
           <div class="asis-stats" style="margin-bottom:10px;">
             <div class="asis-stat"><span class="num">${r.wellness ? r.wellness.valor : '–'}</span><span class="lbl">Wellness (de ${WELLNESS_MAX})</span></div>
             <div class="asis-stat"><span class="num">${r.tqr ? r.tqr.valor : '–'}</span><span class="lbl">TQR (6 a 20)</span></div>
@@ -1355,94 +1418,45 @@
     return { cantidad: asistencias.length, ultima: asistencias[0] ? asistencias[0].fecha : null };
   }
 
-  function renderAdminClientes(data, formError, formNotice) {
-    const editing = state.editingDni ? data.clientes.find(c => c.dni === state.editingDni) : null;
+  // ---------------- Admin: Clientes (lista + ficha) ----------------
+  function iniciales(nombre) {
+    const p = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+    return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+  }
 
-    const q = state.clienteBusqueda.trim().toLowerCase();
-    const clientesFiltrados = q
-      ? data.clientes.filter(c => c.nombre.toLowerCase().includes(q) || c.dni.includes(q))
-      : data.clientes;
+  function textoPlan(c) {
+    return c.plan + ' · ' + (c.dias ? c.dias + (c.dias === 1 ? ' día/sem' : ' días/sem') : 'Integral');
+  }
 
-    const filas = clientesFiltrados.map(c => {
-      const asist = asistenciaMesResumen(data, c.dni);
-      const asistTexto = asist.cantidad > 0
-        ? `Asistió ${asist.cantidad} ${asist.cantidad === 1 ? 'vez' : 'veces'} este mes · última: ${formatFechaCorta(asist.ultima)}`
-        : 'Sin asistencias este mes';
+  function textoCuotaCorto(cuenta) {
+    return ({ 'Al día': 'Cuota al día', 'Vence pronto': 'Cuota vence pronto', 'Para pagar': 'Cuota para pagar',
+              'Vencido': 'Cuota vencida', 'Sin pagos': 'Sin pagos' })[cuenta.label] || cuenta.label;
+  }
 
-      // Al usuario de prueba no se le reclama la matrícula: se muestra solo la leyenda
-      const matriculaHtml = esPrueba(c.dni)
-        ? `<div class="admin-row-asist" style="color:var(--amber); font-weight:600;">Usuario de prueba · no cuenta en cuotas, asistencias ni facturación</div>`
-        : !matriculaActiva()
-        ? ''
-        : (c.matricula && c.matricula.pagada)
-        ? `<div class="admin-row-asist">Matrícula pagada el ${formatFechaCorta(c.matricula.fechaPago)}</div>`
-        : `<div class="admin-row-asist" style="color:var(--red);">Matrícula sin pagar ·
-             <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(matriculaPrecio())})</button>
-           </div>`;
+  function abrirFicha(dni, tab) {
+    if (state.fichaDni !== dni) state.fichaMes = null;
+    state.adminTab = 'clientes';
+    state.fichaDni = dni;
+    state.fichaTab = tab || 'resumen';
+    state.editingDni = state.fichaTab === 'editar' ? dni : null;
+    state.confirmarEliminarDni = null;
+    state.confirmarRutinaId = null;
+    state.adminFormError = '';
+    state.adminFormNotice = '';
+  }
 
-      let pausaHtml = '';
-      if (c.estado === 'Pausado' && c.pausadoDesde) {
-        const dias = diasPausado(c);
-        const vencida = dias > MAX_DIAS_PAUSA;
-        pausaHtml = `<div class="admin-row-asist" style="${vencida?'color:var(--red); font-weight:600;':''}">${
-          vencida
-            ? `Pausado hace ${dias} días — superó el límite de 3 meses`
-            : `Pausado hace ${dias} días (máximo ${MAX_DIAS_PAUSA})`
-        }</div>`;
-      }
+  function cerrarFicha() {
+    state.fichaDni = null;
+    state.fichaTab = 'resumen';
+    state.fichaMes = null;
+    state.editingDni = null;
+    state.confirmarEliminarDni = null;
+    state.confirmarRutinaId = null;
+  }
 
-      const rutinasCount = (c.rutinas || []).length;
-      const rutinasAbierto = state.rutinasAbiertoDni === c.dni;
-      const rutinasPanel = rutinasAbierto ? `
-        <div class="rutinas-panel">
-          ${(c.rutinas||[]).map(r => `
-            <div class="rutina-row">
-              <a href="${r.url}" target="_blank" rel="noopener">${r.titulo}</a>
-              <button class="cancel-link" data-del-rutina="${c.dni}|${r.id}">Eliminar</button>
-            </div>`).join('') || '<div style="font-size:12px;color:var(--text-muted);">Sin rutinas cargadas todavía.</div>'}
-          <div class="rutina-add-form">
-            <input type="text" id="rutinaTitulo-${c.dni}" placeholder="Título (ej: Fuerza - Septiembre)">
-            <input type="text" id="rutinaUrl-${c.dni}" placeholder="Link de Google Sheets / Drive">
-            <button class="slot-btn" data-add-rutina="${c.dni}">Agregar rutina</button>
-          </div>
-        </div>` : '';
-
-      return `
-      <div class="admin-row">
-        <div class="admin-row-info">
-          <div class="admin-row-name">${c.nombre} <span class="admin-row-dni">· DNI ${c.dni}</span></div>
-          <div class="admin-row-meta">${c.plan}${c.telefono ? ' · ' + c.telefono : ''}</div>
-          <div class="admin-row-asist">${asistTexto}</div>
-          ${matriculaHtml}
-          ${pausaHtml}
-        </div>
-        <div class="admin-row-actions">
-          <select class="estado-select estado-${c.estado.toLowerCase()}" data-estado-dni="${c.dni}">
-            <option value="Activo" ${c.estado==='Activo'?'selected':''}>Activo</option>
-            <option value="Pausado" ${c.estado==='Pausado'?'selected':''}>Pausado</option>
-            <option value="Baja" ${c.estado==='Baja'?'selected':''}>Baja</option>
-          </select>
-          <button class="cancel-link" data-toggle-rutinas="${c.dni}">Rutinas (${rutinasCount})</button>
-          <button class="cancel-link" data-edit-dni="${c.dni}">Editar</button>
-          <button class="cancel-link" data-del-dni="${c.dni}">Eliminar</button>
-        </div>
-      </div>
-      ${state.confirmarEliminarDni === c.dni ? `
-      <div class="banner" style="margin:0;">
-        <b>¿Eliminar a ${esc(c.nombre)}?</b>Se borra el cliente con sus datos de acceso y no se puede deshacer. Si solo dejó de venir, conviene pasarlo a "Baja".
-        <div style="display:flex; gap:10px; margin-top:12px;">
-          <button class="btn btn-ghost" data-del-no="1" style="flex:1;">Cancelar</button>
-          <button class="btn btn-primary" data-del-si="${c.dni}" style="flex:1; background:var(--red);">Sí, eliminar</button>
-        </div>
-      </div>` : ''}
-      ${rutinasPanel}
-    `;
-    }).join('') || `<div class="empty-state">Ningún cliente coincide con "${state.clienteBusqueda}".</div>`;
-
+  // Formulario de datos del cliente. Se usa para el alta (editing = null) y en la pestaña Editar de la ficha.
+  function formClienteHtml(editing, formError) {
     return `
-        <p class="sub">${editing ? 'Editando a ' + editing.nombre : 'Cargá un cliente nuevo con sus datos de acceso'}</p>
-
-        <div class="profile-card" style="margin-bottom:24px;">
           <div class="admin-field-grid">
             <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
             <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
@@ -1509,17 +1523,433 @@
           <div class="divider"></div>
           <div class="kv-row"><span class="k">Cuota calculada</span><span class="v" id="fPrecioPreview">—</span></div>
           <div class="error-text">${formError || ''}</div>
-          ${formNotice ? `<div class="banner" style="border-color:var(--green); background:rgba(47,111,237,0.1);"><b style="color:var(--green);">Listo</b>${formNotice}</div>` : ''}
           <div style="display:flex; gap:10px; margin-top:10px;">
             <button class="btn btn-primary" id="addClienteBtn" style="flex:1;">${editing ? 'Guardar cambios' : 'Agregar cliente'}</button>
             ${editing ? `<button class="btn btn-ghost" id="cancelEditBtn">Cancelar</button>` : ''}
+          </div>`;
+  }
+
+  function avisoListoHtml(formNotice) {
+    return formNotice ? `<div class="banner" style="border-color:var(--green); background:rgba(47,111,237,0.1);"><b style="color:var(--green);">Listo</b>${formNotice}</div>` : '';
+  }
+
+  function confirmarEliminarHtml(c) {
+    return `
+      <div class="banner" style="margin:0;">
+        <b>¿Eliminar a ${esc(c.nombre)}?</b>Se borra el cliente con sus datos de acceso y no se puede deshacer. Si solo dejó de venir, conviene pasarlo a "Baja".
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <button class="btn btn-ghost" data-del-no="1" style="flex:1;">Cancelar</button>
+          <button class="btn btn-primary" data-del-si="${c.dni}" style="flex:1; background:var(--red);">Sí, eliminar</button>
+        </div>
+      </div>`;
+  }
+
+  // Tarjeta de un cliente en la lista: toda la tarjeta abre su ficha
+  function tarjetaCliente(data, c) {
+    const asist = asistenciaMesResumen(data, c.dni);
+    const asistTexto = asist.cantidad > 0
+      ? `${asist.cantidad} ${asist.cantidad === 1 ? 'asistencia' : 'asistencias'} este mes · última ${formatFechaCorta(asist.ultima)}`
+      : 'Sin asistencias este mes';
+
+    const pills = [pillForEstado(c.estado)];
+    if (esPrueba(c.dni)) {
+      pills.push('<span class="pill pill-amber">Usuario de prueba</span>');
+    } else if (c.estado !== 'Baja') {
+      const cuenta = cuotaDisplay(data, c.dni);
+      pills.push(`<span class="pill ${cuenta.pill}">${textoCuotaCorto(cuenta)}</span>`);
+      if (matriculaActiva() && !(c.matricula && c.matricula.pagada)) pills.push('<span class="pill pill-red">Matrícula impaga</span>');
+    }
+
+    let pausaHtml = '';
+    if (c.estado === 'Pausado' && c.pausadoDesde) {
+      const dias = diasPausado(c);
+      const vencida = dias > MAX_DIAS_PAUSA;
+      pausaHtml = `<span class="cli-meta" style="${vencida ? 'color:var(--red); font-weight:600;' : ''}">${
+        vencida ? `Pausado hace ${dias} días — superó el límite de 3 meses` : `Pausado hace ${dias} días (máximo ${MAX_DIAS_PAUSA})`}</span>`;
+    }
+
+    return `
+      <button class="cli-card ${c.estado === 'Baja' ? 'baja' : ''}" data-ficha-dni="${c.dni}">
+        <span class="cli-avatar">${esc(iniciales(c.nombre))}</span>
+        <span class="cli-main">
+          <span class="cli-nombre">${esc(c.nombre)}</span>
+          <span class="cli-meta">${esc(textoPlan(c))} · ${asistTexto}</span>
+          ${pausaHtml}
+          <span class="cli-pills">${pills.join('')}</span>
+        </span>
+        <span class="cli-chevron">${ICONOS.der}</span>
+      </button>`;
+  }
+
+  function renderAdminClientes(data, formError, formNotice) {
+    if (state.fichaDni) {
+      const cliente = data.clientes.find(c => c.dni === state.fichaDni);
+      if (cliente) return renderFichaCliente(data, cliente, formError, formNotice);
+      cerrarFicha(); // el cliente ya no existe
+    }
+
+    const q = state.clienteBusqueda.trim().toLowerCase();
+    const orden = { Activo: 0, Pausado: 1, Baja: 2 };
+    const clientesFiltrados = (q
+      ? data.clientes.filter(c => c.nombre.toLowerCase().includes(q) || c.dni.includes(q))
+      : data.clientes
+    ).slice().sort((a, b) => (orden[a.estado] ?? 3) - (orden[b.estado] ?? 3) || a.nombre.localeCompare(b.nombre, 'es'));
+
+    const tarjetas = clientesFiltrados.map(c => tarjetaCliente(data, c)).join('')
+      || `<div class="empty-state">${q ? `Ningún cliente coincide con "${esc(state.clienteBusqueda)}".` : 'Todavía no hay clientes cargados.'}</div>`;
+
+    const altaHtml = state.nuevoClienteAbierto ? `
+        <div class="profile-card" style="margin-bottom:20px;">
+          <div class="cuota-top" style="margin-bottom:14px;">
+            <div class="cuota-nombre" style="font-size:16px;">Nuevo cliente</div>
+            <button class="cancel-link" id="cerrarNuevoBtn">Cerrar</button>
+          </div>
+          ${formClienteHtml(null, formError)}
+        </div>` : `
+        <button class="btn btn-primary" id="nuevoClienteBtn" style="width:100%; margin-bottom:20px;">+ Nuevo cliente</button>`;
+
+    return `
+        <p class="sub">Tocá un cliente para ver su ficha completa</p>
+        ${avisoListoHtml(formNotice)}
+        ${altaHtml}
+        <h2 style="font-size:16px;">Clientes (${clientesFiltrados.length}${q ? ' de ' + data.clientes.length : ''})</h2>
+        <input type="text" id="clienteBuscar" class="date-input" placeholder="Buscar por nombre o DNI..." value="${esc(state.clienteBusqueda)}" style="margin-bottom:12px;">
+        <div class="cli-list">${tarjetas}</div>
+    `;
+  }
+
+  // ---------------- Admin: Ficha del cliente ----------------
+  function renderFichaCliente(data, c, formError, formNotice) {
+    const tab = state.fichaTab || 'resumen';
+    const prueba = esPrueba(c.dni);
+    const cuenta = cuotaDisplay(data, c.dni);
+    const mias = data.reservas.filter(r => r.dni === c.dni && r.estado !== 'cancelado');
+    const ctx = {
+      prueba, cuenta, mias,
+      pagos: pagosDe(data, c.dni),
+      rutinas: c.rutinas || [],
+      proximas: mias.filter(r => estadoEfectivo(r) === 'reservado').sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora)),
+      asistencias: mias.filter(r => estadoEfectivo(r) === 'asistio'),
+    };
+
+    const contacto = [
+      c.telefono ? `<a href="tel:${esc(String(c.telefono).replace(/[^\d+]/g, ''))}">${esc(c.telefono)}</a>` : '',
+      c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '',
+    ].filter(Boolean).join(' · ');
+
+    const pills = [];
+    if (prueba) pills.push('<span class="pill pill-amber">Usuario de prueba</span>');
+    else if (c.estado !== 'Baja') {
+      pills.push(`<span class="pill ${cuenta.pill}">${textoCuotaCorto(cuenta)}</span>`);
+      if (matriculaActiva() && !(c.matricula && c.matricula.pagada)) pills.push('<span class="pill pill-red">Matrícula impaga</span>');
+    }
+
+    let pausaHtml = '';
+    if (c.estado === 'Pausado' && c.pausadoDesde) {
+      const dias = diasPausado(c);
+      const vencida = dias > MAX_DIAS_PAUSA;
+      pausaHtml = `<div class="cli-meta" style="margin:-6px 0 14px; ${vencida ? 'color:var(--red); font-weight:600;' : ''}">${
+        vencida ? `Pausado hace ${dias} días — superó el límite de 3 meses` : `Pausado hace ${dias} días (máximo ${MAX_DIAS_PAUSA})`}</div>`;
+    }
+
+    const tabs = [['resumen', 'Resumen'], ['pagos', 'Pagos'], ['asistencias', 'Asistencias'], ['rutinas', 'Rutinas'], ['editar', 'Editar']];
+    const nombresOrigen = { cuotas: 'Volver a Cuotas', asistencias: 'Volver a Asistencias', pro: 'Volver a Pro' };
+
+    let cuerpo;
+    if (tab === 'pagos') cuerpo = fichaPagos(data, c, ctx);
+    else if (tab === 'asistencias') cuerpo = fichaAsistencias(data, c, ctx);
+    else if (tab === 'rutinas') cuerpo = fichaRutinas(data, c, ctx);
+    else if (tab === 'editar') cuerpo = fichaEditar(data, c, formError, formNotice);
+    else cuerpo = fichaResumen(data, c, ctx);
+
+    return `
+      <div class="ficha">
+        <button class="link-btn" id="fichaVolverBtn">← ${nombresOrigen[state.fichaOrigen] || 'Todos los clientes'}</button>
+        <div class="ficha-head">
+          <span class="cli-avatar grande">${esc(iniciales(c.nombre))}</span>
+          <div class="ficha-head-info">
+            <div class="ficha-nombre">${esc(c.nombre)}</div>
+            <div class="cli-meta">DNI ${esc(c.dni)} · ${esc(textoPlan(c))}</div>
+            ${contacto ? `<div class="cli-meta ficha-contacto">${contacto}</div>` : ''}
           </div>
         </div>
+        <div class="ficha-estado">
+          <select class="estado-select estado-${c.estado.toLowerCase()}" data-estado-dni="${c.dni}" aria-label="Estado del cliente">
+            <option value="Activo" ${c.estado==='Activo'?'selected':''}>Activo</option>
+            <option value="Pausado" ${c.estado==='Pausado'?'selected':''}>Pausado</option>
+            <option value="Baja" ${c.estado==='Baja'?'selected':''}>Baja</option>
+          </select>
+          ${pills.join('')}
+        </div>
+        ${pausaHtml}
+        <div class="seg ficha-tabs">
+          ${tabs.map(([id, label]) => `<button class="seg-btn ${tab === id ? 'active' : ''}" data-ficha-tab="${id}">${label}</button>`).join('')}
+        </div>
+        ${cuerpo}
+      </div>`;
+  }
 
-        <h2 style="font-size:16px;">Clientes cargados (${clientesFiltrados.length}${q ? ' de ' + data.clientes.length : ''})</h2>
-        <input type="text" id="clienteBuscar" class="date-input" placeholder="Buscar por nombre o DNI..." value="${state.clienteBusqueda}" style="margin-bottom:12px;">
-        <div class="admin-list">${filas}</div>
-    `;
+  function rutinaHost(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return ''; }
+  }
+
+  function fichaResumen(data, c, ctx) {
+    const hoyIso = isoDate(new Date());
+    const esteMes = ctx.asistencias.filter(r => r.fecha.slice(0, 7) === hoyIso.slice(0, 7)).length;
+    const limite = limiteSemanalDe(c);
+    const turnosSemana = reservasEnSemana(data, c.dni, hoyIso).length;
+    const racha = rachaSemanas(ctx.asistencias);
+    const ultimoPago = ctx.pagos[0] || null;
+
+    const matriculaHtml = !matriculaActiva() ? '' : (c.matricula && c.matricula.pagada)
+      ? `<div class="kv-row"><span class="k">Matrícula</span><span class="v">Pagada el ${formatFechaCorta(c.matricula.fechaPago)}</span></div>`
+      : `<div class="kv-row"><span class="k">Matrícula</span><span class="v" style="color:var(--red);">Sin pagar · <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(matriculaPrecio())})</button></span></div>`;
+
+    const turnosHtml = ctx.proximas.length
+      ? ctx.proximas.slice(0, 3).map(r => `<div class="kv-row"><span class="k">${fechaLarga(r.fecha)}</span><span class="v">${String(r.hora).slice(0, 5)} hs</span></div>`).join('')
+        + (ctx.proximas.length > 3 ? `<div class="pago-detalle" style="margin-top:4px;">y ${ctx.proximas.length - 3} más</div>` : '')
+      : `<div class="pago-detalle">No tiene turnos reservados.</div>`;
+
+    const r0 = ctx.rutinas[0];
+    const rutinaHtml = r0 ? `
+          <div class="rutina-adm-top" style="margin-top:4px;">
+            <div style="min-width:0;">
+              <div class="rutina-card-titulo">${esc(r0.titulo)}</div>
+              <div class="rutina-card-fecha">${r0.fecha ? 'Cargada el ' + formatFecha(r0.fecha) : ''}</div>
+            </div>
+            <a class="btn btn-primary rutina-abrir" href="${esc(r0.url)}" target="_blank" rel="noopener">Abrir</a>
+          </div>` : `<div class="pago-detalle">Todavía no tiene rutinas cargadas.</div>`;
+
+    const proHtml = !esPro(c) ? '' : `
+        <div class="cuota-card ficha-card">
+          <div class="cuota-nombre" style="margin-bottom:10px;">Control diario · últimos 7 días</div>
+          ${data.registrosProListo ? tablaUltimosDiasPro(data, c.dni, hoyIso) : '<div class="pago-detalle">El control diario todavía no está activado en la base.</div>'}
+        </div>`;
+
+    const estimulosHtml = c.estimulos ? `
+          <div class="estimulos-grid" style="margin:6px 0 4px;">
+            <div class="estimulo-chip"><span class="num">${c.estimulos.fuerza}</span>Fuerza / sem</div>
+            <div class="estimulo-chip"><span class="num">${c.estimulos.resistencia}</span>Resist. / sem</div>
+            <div class="estimulo-chip"><span class="num">${c.estimulos.velocidad}</span>Veloc. / sem</div>
+          </div>` : '';
+
+    return `
+        <div class="asis-stats">
+          <div class="asis-stat"><span class="num">${esteMes}</span><span class="lbl">${esteMes === 1 ? 'asistencia' : 'asistencias'} este mes</span></div>
+          <div class="asis-stat"><span class="num">${turnosSemana}${isFinite(limite) ? `<small>/${limite}</small>` : ''}</span><span class="lbl">turnos esta semana</span></div>
+          <div class="asis-stat"><span class="num">${racha}</span><span class="lbl">${racha === 1 ? 'semana seguida' : 'semanas seguidas'}</span></div>
+        </div>
+
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Cuota</div>
+            <span class="pill ${ctx.cuenta.pill}">${ctx.cuenta.label}</span>
+          </div>
+          ${ctx.prueba ? `<div class="pago-detalle" style="margin-bottom:6px;">Usuario de prueba: no figura en Cuotas ni suma en lo cobrado.</div>` : ''}
+          <div class="kv-row"><span class="k">Plan</span><span class="v">${esc(c.plan)} · ${money(c.precio || 0)} / mes</span></div>
+          ${infoVencimientoHtml(ctx.cuenta)}
+          ${ultimoPago ? `<div class="kv-row"><span class="k">Último pago</span><span class="v">${formatFecha(ultimoPago.fechaPago)} · ${money(ultimoPago.monto || 0)}</span></div>` : ''}
+          ${matriculaHtml}
+          <button class="slot-btn" data-ir-tab="pagos" style="width:100%; margin-top:10px;">Registrar pago o ver historial</button>
+        </div>
+
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Próximos turnos</div>
+            <button class="cancel-link" data-ir-tab="asistencias">Ver asistencias</button>
+          </div>
+          ${turnosHtml}
+        </div>
+
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Rutinas${ctx.rutinas.length ? ' (' + ctx.rutinas.length + ')' : ''}</div>
+            <button class="cancel-link" data-ir-tab="rutinas">${ctx.rutinas.length ? 'Ver todas' : 'Cargar una'}</button>
+          </div>
+          ${rutinaHtml}
+        </div>
+        ${proHtml}
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Plan contratado</div>
+            <button class="cancel-link" data-ir-tab="editar">Editar</button>
+          </div>
+          <div class="kv-row"><span class="k">Días presenciales</span><span class="v">${c.dias ? c.dias + ' por semana' : 'Integral — sin días fijos'}</span></div>
+          ${estimulosHtml}
+          <div class="kv-row"><span class="k">Turnos por semana</span><span class="v">${isFinite(limite) ? limite + (c.limiteSemanalOverride != null ? ' (excepción)' : '') : 'Sin límite'}</span></div>
+        </div>`;
+  }
+
+  function fichaPagos(data, c, ctx) {
+    const totalPagado = ctx.pagos.reduce((sum, p) => sum + (p.monto || 0), 0);
+    return `
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Estado de la cuota</div>
+            <span class="pill ${ctx.cuenta.pill}">${ctx.cuenta.label}</span>
+          </div>
+          ${ctx.prueba ? `<div class="pago-detalle" style="margin-bottom:6px;">Usuario de prueba: sus pagos no figuran en Cuotas ni suman en lo cobrado.</div>` : ''}
+          ${infoVencimientoHtml(ctx.cuenta)}
+        </div>
+
+        <div class="cuota-card ficha-card">
+          <div class="cuota-nombre">Registrar un pago</div>
+          ${formRegistrarPagoHtml(data, c)}
+        </div>
+
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Historial de pagos</div>
+            <span class="pago-detalle">${ctx.pagos.length} ${ctx.pagos.length === 1 ? 'pago' : 'pagos'}</span>
+          </div>
+          ${ctx.pagos.length
+            ? filasHistorialPagos(ctx.pagos, true) + `<div class="pago-total"><span>Total pagado</span><span>${money(totalPagado)}</span></div>`
+            : `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`}
+        </div>`;
+  }
+
+  function fichaAsistencias(data, c, ctx) {
+    const proximasHtml = ctx.proximas.length ? `
+        <div class="cuota-card ficha-card">
+          <div class="cuota-nombre" style="margin-bottom:4px;">Próximos turnos (${ctx.proximas.length})</div>
+          ${ctx.proximas.map(r => `<div class="kv-row"><span class="k">${fechaLarga(r.fecha)}</span><span class="v">${String(r.hora).slice(0, 5)} hs</span></div>`).join('')}
+        </div>` : '';
+    return proximasHtml + renderReservasAsistencias(c, data, ctx.mias, ctx.asistencias, { admin: true });
+  }
+
+  function fichaRutinas(data, c, ctx) {
+    const tarjetas = ctx.rutinas.map((r, i) => {
+      const host = rutinaHost(r.url);
+      const confirmando = state.confirmarRutinaId === r.id;
+      return `
+        <div class="rutina-adm">
+          <div class="rutina-adm-top">
+            <div style="min-width:0;">
+              <div class="rutina-card-titulo">${esc(r.titulo)}</div>
+              <div class="rutina-card-fecha">${[r.fecha ? 'Cargada el ' + formatFecha(r.fecha) : '', esc(host)].filter(Boolean).join(' · ')}</div>
+            </div>
+            <a class="btn btn-primary rutina-abrir" href="${esc(r.url)}" target="_blank" rel="noopener">Abrir</a>
+          </div>
+          <div class="rutina-adm-acciones">
+            ${(i === 0 && ctx.rutinas.length > 1) ? '<span class="pill pill-green">La más nueva</span>' : '<span></span>'}
+            ${confirmando
+              ? `<span>¿Eliminarla? <button class="cancel-link" data-del-rutina="${c.dni}|${r.id}" style="color:var(--red);">Sí, eliminar</button> · <button class="cancel-link" data-del-rutina-no="1">Cancelar</button></span>`
+              : `<button class="cancel-link" data-pedir-del-rutina="${r.id}">Eliminar</button>`}
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+        ${ctx.rutinas.length
+          ? `<p class="sub" style="margin-bottom:12px;">${ctx.rutinas.length} ${ctx.rutinas.length === 1 ? 'rutina cargada' : 'rutinas cargadas'}, de la más nueva a la más vieja</p>${tarjetas}`
+          : `<div class="empty-state" style="padding:28px 20px;">Todavía no tiene rutinas cargadas.</div>`}
+
+        <div class="cuota-card ficha-card" style="margin-top:16px;">
+          <div class="cuota-nombre" style="margin-bottom:10px;">Cargar una rutina nueva</div>
+          <div class="rutina-add-form" style="margin-top:0;">
+            <input type="text" id="rutinaTitulo-${c.dni}" placeholder="Título (ej: Fuerza - Octubre)">
+            <input type="text" id="rutinaUrl-${c.dni}" placeholder="Link de Google Sheets / Drive">
+            <button class="btn btn-primary" data-add-rutina="${c.dni}">Agregar rutina</button>
+          </div>
+          <div class="pago-detalle" style="margin-top:10px; line-height:1.5;">El cliente la ve al instante en su pestaña "Rutina". Para que pueda abrirla, el archivo tiene que estar compartido como "cualquier persona con el enlace".</div>
+        </div>`;
+  }
+
+  function fichaEditar(data, c, formError, formNotice) {
+    return `
+        ${avisoListoHtml(formNotice)}
+        <div class="profile-card" style="margin-bottom:16px;">
+          ${formClienteHtml(c, formError)}
+        </div>
+        ${state.confirmarEliminarDni === c.dni ? confirmarEliminarHtml(c) : `
+        <div class="cuota-card ficha-card">
+          <div class="cuota-nombre">Eliminar cliente</div>
+          <div class="pago-detalle" style="margin:4px 0 10px; line-height:1.5;">Borra al cliente y sus datos de acceso. Si solo dejó de venir, conviene pasarlo a "Baja".</div>
+          <button class="cancel-link" data-del-dni="${c.dni}" style="color:var(--red);">Eliminar a ${esc(c.nombre)}</button>
+        </div>`}`;
+  }
+
+  // Botones de la pestaña Clientes (lista y ficha)
+  function wireClientes(root) {
+    const on = (sel, fn) => root.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
+    if (document.getElementById('addClienteBtn')) wireAdminForm();
+
+    on('#nuevoClienteBtn', () => { state.nuevoClienteAbierto = true; state.adminFormError = ''; state.adminFormNotice = ''; renderApp(); });
+    on('#cerrarNuevoBtn', () => { state.nuevoClienteAbierto = false; state.adminFormError = ''; renderApp(); });
+
+    on('#fichaVolverBtn', () => {
+      const origen = state.fichaOrigen || 'clientes';
+      cerrarFicha();
+      state.adminFormNotice = '';
+      state.adminTab = origen;
+      state.fichaOrigen = 'clientes';
+      renderApp();
+      window.scrollTo(0, state.listaScrollY || 0);
+    });
+    on('[data-ficha-tab]', el => { abrirFicha(state.fichaDni, el.dataset.fichaTab); renderApp(); });
+    on('[data-ir-tab]', el => { abrirFicha(state.fichaDni, el.dataset.irTab); renderApp(); window.scrollTo(0, 0); });
+    on('#cancelEditBtn', () => { abrirFicha(state.fichaDni, 'resumen'); renderApp(); window.scrollTo(0, 0); });
+
+    root.querySelectorAll('[data-estado-dni]').forEach(sel => {
+      sel.onchange = () => cambiarEstadoCliente(sel.dataset.estadoDni, sel.value);
+    });
+    on('[data-matricula-dni]', el => registrarMatricula(el.dataset.matriculaDni));
+
+    // Rutinas: "Eliminar" primero pregunta
+    on('[data-add-rutina]', el => agregarRutina(el.dataset.addRutina));
+    on('[data-pedir-del-rutina]', el => { state.confirmarRutinaId = el.dataset.pedirDelRutina; renderApp(); });
+    on('[data-del-rutina-no]', () => { state.confirmarRutinaId = null; renderApp(); });
+    on('[data-del-rutina]', el => {
+      const [dni, rutinaId] = el.dataset.delRutina.split('|');
+      eliminarRutina(dni, rutinaId);
+    });
+
+    // Eliminar cliente: "Eliminar" solo abre la pregunta; recién "Sí, eliminar" borra
+    on('[data-del-dni]', el => { state.confirmarEliminarDni = el.dataset.delDni; renderApp(); });
+    on('[data-del-si]', el => { el.disabled = true; eliminarCliente(el.dataset.delSi); });
+    on('[data-del-no]', () => { state.confirmarEliminarDni = null; renderApp(); });
+
+    on('[data-cal-mes]', el => { state.fichaMes = el.dataset.calMes; renderApp(); });
+    wirePagos(root);
+
+    const buscarInput = document.getElementById('clienteBuscar');
+    if (buscarInput) {
+      buscarInput.oninput = (e) => {
+        state.clienteBusqueda = e.target.value;
+        renderApp();
+        const el = document.getElementById('clienteBuscar');
+        if (el) {
+          el.focus();
+          const pos = el.value.length;
+          el.setSelectionRange(pos, pos);
+        }
+      };
+    }
+  }
+
+  // Botones para registrar y deshacer pagos (pestaña Cuotas y pestaña Pagos de la ficha)
+  function wirePagos(root) {
+    root.querySelectorAll('[data-registrar-pago]').forEach(btn => {
+      btn.onclick = () => {
+        const dni = btn.dataset.registrarPago;
+        const durSel = document.querySelector(`[data-duracion-dni="${dni}"]`);
+        const metSel = document.querySelector(`[data-metodo-dni="${dni}"]`);
+        const notaInput = document.querySelector(`[data-comprobante-dni="${dni}"]`);
+        registrarNuevoPago(dni, durSel.value, metSel.value, notaInput ? notaInput.value : '');
+      };
+    });
+    // Al cambiar la duración se actualiza el período que cubriría el pago
+    root.querySelectorAll('[data-duracion-dni]').forEach(sel => {
+      sel.onchange = () => {
+        const dni = sel.dataset.duracionDni;
+        const previo = periodoNuevoPago(state.data, dni, sel.value);
+        const el = document.querySelector(`[data-preview-dni="${dni}"]`);
+        if (el) el.textContent = 'Este pago cubre del ' + formatFechaCorta(isoDate(previo.base)) + ' al ' + formatFechaCorta(isoDate(previo.venc)) + '.';
+      };
+    });
+    root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
+      btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
+    });
   }
 
   // ---------------- Admin: Cuotas ----------------
@@ -1749,27 +2179,44 @@
     renderApp();
   }
 
+  // Renglones de vencimiento de una cuenta (pestaña Cuotas y ficha del cliente)
+  function infoVencimientoHtml(cuenta) {
+    const dias = (n) => ' (' + n + (n === 1 ? ' día)' : ' días)');
+    if (!cuenta.ultimo) return `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
+    if (cuenta.estado === 'En período de pago') {
+      return `
+          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          <div class="kv-row"><span class="k">Puede pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}${dias(cuenta.diasRestantes)}</span></div>`;
+    }
+    if (cuenta.estado === 'Vencido') {
+      return `
+          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
+          <div class="kv-row"><span class="k">El plazo para pagar terminó</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
+    }
+    return `<div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${dias(cuenta.diasRestantes)}</span></div>`;
+  }
+
+  // Controles para registrar un pago de un cliente (pestaña Cuotas y ficha del cliente)
+  function formRegistrarPagoHtml(data, c) {
+    const previo = periodoNuevoPago(data, c.dni, '1m');
+    return `
+          <div class="pago-registrar">
+            <select class="duracion-select" data-duracion-dni="${c.dni}">
+              ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label} — ${money(Math.round((c.precio || 0)*d.factor))}</option>`).join('')}
+            </select>
+            <select class="metodo-select" data-metodo-dni="${c.dni}">
+              ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+          </div>
+          <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
+          <div class="pago-preview" data-preview-dni="${c.dni}">Este pago cubre del ${formatFechaCorta(isoDate(previo.base))} al ${formatFechaCorta(isoDate(previo.venc))}.</div>
+          <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>`;
+  }
+
   function renderAdminCuotas(data) {
     const card = (c) => {
       const cuenta = cuotaDisplay(data, c.dni);
       const pagos = pagosDe(data, c.dni);
-      const dias = (n) => ' (' + n + (n === 1 ? ' día)' : ' días)');
-
-      let infoVencimiento;
-      if (!cuenta.ultimo) {
-        infoVencimiento = `<div class="pago-detalle">Todavía no tiene ningún pago registrado.</div>`;
-      } else if (cuenta.estado === 'En período de pago') {
-        infoVencimiento = `
-          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
-          <div class="kv-row"><span class="k">Puede pagar hasta</span><span class="v">${formatFechaCorta(cuenta.limite)}${dias(cuenta.diasRestantes)}</span></div>`;
-      } else if (cuenta.estado === 'Vencido') {
-        infoVencimiento = `
-          <div class="kv-row"><span class="k">Venció</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}</span></div>
-          <div class="kv-row"><span class="k">El plazo para pagar terminó</span><span class="v">${formatFechaCorta(cuenta.limite)}</span></div>`;
-      } else {
-        infoVencimiento = `<div class="kv-row"><span class="k">Vence</span><span class="v">${formatFechaCorta(cuenta.vencimiento)}${dias(cuenta.diasRestantes)}</span></div>`;
-      }
-
       const totalPagado = pagos.reduce((sum, p) => sum + (p.monto || 0), 0);
       const historialHtml = pagos.length ? `
           <details class="pago-hist">
@@ -1778,27 +2225,15 @@
             <div class="pago-total"><span>Total pagado</span><span>${money(totalPagado)}</span></div>
           </details>` : '';
 
-      const previo = periodoNuevoPago(data, c.dni, '1m');
-
       return `
         <div class="cuota-card">
           <div class="cuota-top">
-            <div class="cuota-nombre">${c.nombre}</div>
+            <button class="nombre-link cuota-nombre" data-ficha-dni="${c.dni}">${c.nombre}</button>
             <span class="pill ${cuenta.pill}">${cuenta.label}</span>
           </div>
-          ${infoVencimiento}
+          ${infoVencimientoHtml(cuenta)}
           ${historialHtml}
-          <div class="pago-registrar">
-            <select class="duracion-select" data-duracion-dni="${c.dni}">
-              ${DURACIONES.map(d => `<option value="${d.id}" ${d.id==='1m'?'selected':''}>${d.label} — ${money(Math.round(c.precio*d.factor))}</option>`).join('')}
-            </select>
-            <select class="metodo-select" data-metodo-dni="${c.dni}">
-              ${METODOS_PAGO.map(m => `<option value="${m}">${m}</option>`).join('')}
-            </select>
-          </div>
-          <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
-          <div class="pago-preview" data-preview-dni="${c.dni}">Este pago cubre del ${formatFechaCorta(isoDate(previo.base))} al ${formatFechaCorta(isoDate(previo.venc))}.</div>
-          <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>
+          ${formRegistrarPagoHtml(data, c)}
         </div>`;
     };
 
@@ -1874,7 +2309,9 @@
               <div class="asist-group-header">${g.hora} <span class="asist-group-count">${g.items.length} ${g.items.length===1?'persona':'personas'}</span></div>
               ${g.items.map(r => {
                 const cliente = data.clientes.find(c => c.dni === r.dni);
-                return `<div class="asist-row"><span class="asist-nombre-solo">${cliente ? cliente.nombre : r.dni}</span></div>`;
+                return `<div class="asist-row">${cliente
+                  ? `<button class="nombre-link asist-nombre-solo" data-ficha-dni="${cliente.dni}">${cliente.nombre}</button>`
+                  : `<span class="asist-nombre-solo">${r.dni}</span>`}</div>`;
               }).join('')}
             </div>`).join('')
         : `<div class="empty-state">Todavía nadie se anotó para este día.</div>`;
@@ -1907,7 +2344,9 @@
             </div>` : '';
         return `
           <div class="asist-row">
-            <span class="asist-nombre-solo">${nombre}</span>
+            ${cliente
+              ? `<button class="nombre-link asist-nombre-solo" data-ficha-dni="${cliente.dni}">${nombre}</button>`
+              : `<span class="asist-nombre-solo">${nombre}</span>`}
             ${botones}
           </div>`;
       }).join('');
@@ -2249,9 +2688,9 @@
         </div>`;
     }
     const items = rutinas.map(r => `
-      <a class="rutina-card" href="${r.url}" target="_blank" rel="noopener">
+      <a class="rutina-card" href="${esc(r.url)}" target="_blank" rel="noopener">
         <div class="rutina-card-info">
-          <div class="rutina-card-titulo">${r.titulo}</div>
+          <div class="rutina-card-titulo">${esc(r.titulo)}</div>
           <div class="rutina-card-fecha">Cargada el ${formatFechaCorta(r.fecha)}</div>
         </div>
         <span class="rutina-card-arrow">Abrir</span>
@@ -2396,7 +2835,9 @@
         </div>`).join('');
   }
 
-  function renderReservasAsistencias(cliente, data, mias, asistencias) {
+  // 'opts.admin' = se está mirando desde la ficha del cliente en administración
+  function renderReservasAsistencias(cliente, data, mias, asistencias, opts) {
+    const admin = !!(opts && opts.admin);
     const hoyIso = isoDate(new Date());
     const mesHoy = hoyIso.slice(0, 7);
 
@@ -2419,7 +2860,7 @@
     const mesMin = fechasMias.length ? (fechasMias[0].slice(0, 7) < mesHoy ? fechasMias[0].slice(0, 7) : mesHoy) : mesHoy;
     const ultimaFecha = fechasMias.length ? fechasMias[fechasMias.length - 1].slice(0, 7) : mesHoy;
     const mesMax = ultimaFecha > mesHoy ? ultimaFecha : mesHoy;
-    let mes = state.asistMes || mesHoy;
+    let mes = (admin ? state.fichaMes : state.asistMes) || mesHoy;
     if (mes < mesMin) mes = mesMin;
     if (mes > mesMax) mes = mesMax;
 
@@ -2456,9 +2897,9 @@
         </div>
         <div class="cal-grid">${celdas}</div>
         <div class="cal-leyenda">
-          <span><i class="asistio"></i>Asististe</span>
+          <span><i class="asistio"></i>${admin ? 'Asistió' : 'Asististe'}</span>
           <span><i class="reservado"></i>Turno reservado</span>
-          <span><i class="falto"></i>Faltaste</span>
+          <span><i class="falto"></i>${admin ? 'Faltó' : 'Faltaste'}</span>
         </div>
       </div>`;
 
@@ -2492,7 +2933,7 @@
       extrasHtml = `
         <div class="profile-card" style="padding:8px 16px; margin:18px 0 0;">
           <div class="kv-row"><span class="k">Último entrenamiento</span><span class="v">${fechaLarga(ultima.fecha)}</span></div>
-          <div class="kv-row"><span class="k">Tu horario más frecuente</span><span class="v">${horaFrecuente} hs</span></div>
+          <div class="kv-row"><span class="k">${admin ? 'Horario más frecuente' : 'Tu horario más frecuente'}</span><span class="v">${horaFrecuente} hs</span></div>
         </div>`;
     }
 
@@ -2541,82 +2982,35 @@
 
       root.querySelectorAll('[data-admin-tab]').forEach(btn => {
         btn.onclick = () => {
+          cerrarFicha();
+          state.fichaOrigen = 'clientes';
           state.adminTab = btn.dataset.adminTab;
-          state.confirmarEliminarDni = null;
           renderApp();
         };
       });
 
+      // La pestaña activa se acomoda moviendo solo la barra de pestañas hacia el
+      // costado: así la pantalla no salta arriba cada vez que se toca un botón.
       const tabActiva = root.querySelector('.admin-tab.active');
-      if (tabActiva) tabActiva.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-
-      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; state.editingDni = null; state.confirmarEliminarDni = null; renderApp(); };
-
-      if (state.adminTab === 'clientes') {
-        wireAdminForm();
-        // "Eliminar" solo abre la pregunta; recién "Sí, eliminar" borra
-        root.querySelectorAll('[data-del-dni]').forEach(btn => {
-          btn.onclick = () => {
-            state.confirmarEliminarDni = state.confirmarEliminarDni === btn.dataset.delDni ? null : btn.dataset.delDni;
-            renderApp();
-          };
-        });
-        root.querySelectorAll('[data-del-si]').forEach(btn => {
-          btn.onclick = () => { btn.disabled = true; eliminarCliente(btn.dataset.delSi); };
-        });
-        root.querySelectorAll('[data-del-no]').forEach(btn => {
-          btn.onclick = () => { state.confirmarEliminarDni = null; renderApp(); };
-        });
-        root.querySelectorAll('[data-estado-dni]').forEach(sel => {
-          sel.onchange = () => cambiarEstadoCliente(sel.dataset.estadoDni, sel.value);
-        });
-        root.querySelectorAll('[data-matricula-dni]').forEach(btn => {
-          btn.onclick = () => registrarMatricula(btn.dataset.matriculaDni);
-        });
-        root.querySelectorAll('[data-toggle-rutinas]').forEach(btn => {
-          btn.onclick = () => {
-            const dni = btn.dataset.toggleRutinas;
-            state.rutinasAbiertoDni = state.rutinasAbiertoDni === dni ? null : dni;
-            renderApp();
-          };
-        });
-        root.querySelectorAll('[data-add-rutina]').forEach(btn => {
-          btn.onclick = () => {
-            const dni = btn.dataset.addRutina;
-            agregarRutina(dni);
-          };
-        });
-        root.querySelectorAll('[data-del-rutina]').forEach(btn => {
-          btn.onclick = () => {
-            const [dni, rutinaId] = btn.dataset.delRutina.split('|');
-            eliminarRutina(dni, rutinaId);
-          };
-        });
-        root.querySelectorAll('[data-edit-dni]').forEach(btn => {
-          btn.onclick = () => {
-            state.editingDni = btn.dataset.editDni;
-            state.confirmarEliminarDni = null;
-            state.adminFormError = ''; state.adminFormNotice = '';
-            renderApp();
-          };
-        });
-        const cancelBtn = document.getElementById('cancelEditBtn');
-        if (cancelBtn) cancelBtn.onclick = () => { state.editingDni = null; renderApp(); };
-
-        const buscarInput = document.getElementById('clienteBuscar');
-        if (buscarInput) {
-          buscarInput.oninput = (e) => {
-            state.clienteBusqueda = e.target.value;
-            renderApp();
-            const el = document.getElementById('clienteBuscar');
-            if (el) {
-              el.focus();
-              const pos = el.value.length;
-              el.setSelectionRange(pos, pos);
-            }
-          };
-        }
+      if (tabActiva) {
+        const barra = tabActiva.parentElement;
+        barra.scrollLeft = Math.max(0, (tabActiva.offsetLeft - barra.offsetLeft) - (barra.clientWidth - tabActiva.offsetWidth) / 2);
       }
+
+      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; cerrarFicha(); state.fichaOrigen = 'clientes'; state.nuevoClienteAbierto = false; renderApp(); };
+
+      // Cualquier nombre o tarjeta de cliente abre su ficha
+      root.querySelectorAll('[data-ficha-dni]').forEach(btn => {
+        btn.onclick = () => {
+          state.fichaOrigen = state.adminTab;
+          state.listaScrollY = window.scrollY;
+          abrirFicha(btn.dataset.fichaDni, 'resumen');
+          renderApp();
+          window.scrollTo(0, 0);
+        };
+      });
+
+      if (state.adminTab === 'clientes') wireClientes(root);
 
       if (state.adminTab === 'asistencias') {
         document.getElementById('asistFechaInput').onchange = (e) => {
@@ -2643,29 +3037,9 @@
       }
 
       if (state.adminTab === 'cuotas') {
-        root.querySelectorAll('[data-registrar-pago]').forEach(btn => {
-          btn.onclick = () => {
-            const dni = btn.dataset.registrarPago;
-            const durSel = document.querySelector(`[data-duracion-dni="${dni}"]`);
-            const metSel = document.querySelector(`[data-metodo-dni="${dni}"]`);
-            const notaInput = document.querySelector(`[data-comprobante-dni="${dni}"]`);
-            registrarNuevoPago(dni, durSel.value, metSel.value, notaInput ? notaInput.value : '');
-          };
-        });
-        // Al cambiar la duración se actualiza el período que cubriría el pago
-        root.querySelectorAll('[data-duracion-dni]').forEach(sel => {
-          sel.onchange = () => {
-            const dni = sel.dataset.duracionDni;
-            const previo = periodoNuevoPago(state.data, dni, sel.value);
-            const el = document.querySelector(`[data-preview-dni="${dni}"]`);
-            if (el) el.textContent = 'Este pago cubre del ' + formatFechaCorta(isoDate(previo.base)) + ' al ' + formatFechaCorta(isoDate(previo.venc)) + '.';
-          };
-        });
+        wirePagos(root);
         const exportBtn = document.getElementById('exportPagosBtn');
         if (exportBtn) exportBtn.onclick = descargarPagosExcel;
-        root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
-          btn.onclick = () => eliminarPago(btn.dataset.eliminarPago);
-        });
       }
 
       if (state.adminTab === 'planes') {
@@ -2982,7 +3356,6 @@
       await refreshData();
       // Se confirma contra lo que realmente quedó guardado en la base
       const okMarca = esPrueba(dniEditado) === marcarPrueba;
-      state.editingDni = null;
       state.adminFormError = '';
       state.adminFormNotice = `${nombre} se actualizó correctamente.${nota}${
         !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}`;
@@ -3030,6 +3403,7 @@
     if (marcarPrueba) await guardarMarcaPrueba(dni, true);
     await refreshData();
     state.adminFormError = '';
+    state.nuevoClienteAbierto = false;
     state.adminFormNotice = `${nombre} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}`;
     renderApp();
   }
@@ -3064,6 +3438,7 @@
 
   async function eliminarCliente(dni) {
     state.confirmarEliminarDni = null;
+    if (state.fichaDni === dni) { cerrarFicha(); state.fichaOrigen = 'clientes'; }
     const { error } = await sb.from('clientes').delete().eq('dni', dni);
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
     // Sus registros de control diario se borran con él (si la tabla existe)
@@ -3143,6 +3518,7 @@
   async function eliminarRutina(dni, rutinaId) {
     const { error } = await sb.from('rutinas').delete().eq('id', rutinaId);
     if (error) { showToast('No se pudo eliminar.'); console.error(error); return; }
+    state.confirmarRutinaId = null;
     await refreshData();
     showToast('Rutina eliminada');
     renderApp();
