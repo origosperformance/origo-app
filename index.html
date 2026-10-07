@@ -1072,7 +1072,22 @@
     await sb.from('config').insert(configSeed);
   }
 
-  async function refreshData() {
+  // Varias lecturas pueden cruzarse (una por detrás al cambiar de pestaña y otra
+  // por una acción). Siempre vale la última que se pidió: una respuesta más
+  // vieja que llega tarde se descarta, así nunca pisa datos más nuevos. Quien
+  // espera a refreshData() sigue recién cuando los datos más nuevos ya están.
+  let refreshTurno = 0;
+  let refreshUltimo = null;
+  let ultimaLectura = 0;   // momento de la última lectura aplicada o pedida por detrás
+
+  function refreshData(silencioso) {
+    const turno = ++refreshTurno;
+    const pedido = leerBase(turno, silencioso).then(() => (turno === refreshTurno ? undefined : refreshUltimo));
+    refreshUltimo = pedido;
+    return pedido;
+  }
+
+  async function leerBase(turno, silencioso) {
     const [clientesRes, reservasRes, pagosRes, rutinasRes, planesRes, configRes, registrosProRes] = await Promise.all([
       sb.from('clientes').select('*'),
       sb.from('reservas').select('*'),
@@ -1082,11 +1097,12 @@
       sb.from('config').select('*'),
       sb.from('registros_pro').select('*'),
     ]);
+    if (turno !== refreshTurno) return; // ya salió una lectura más nueva
 
     if (clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error) {
       const primerError = clientesRes.error || reservasRes.error || pagosRes.error || rutinasRes.error || planesRes.error || configRes.error;
       console.error('Error leyendo Supabase:', primerError.message || primerError);
-      showToast('Error de base de datos: ' + (primerError.message || 'desconocido'));
+      if (!silencioso) showToast('Error de base de datos: ' + (primerError.message || 'desconocido'));
       state.data = state.data || { clientes: [], reservas: [], pagos: [], planes: [], config: [] };
       return;
     }
@@ -1095,7 +1111,7 @@
     // (esto sí hace falta siempre — son datos reales, no de prueba)
     if (planesRes.data.length === 0) {
       await sembrarPlanesIniciales();
-      return refreshData();
+      return refreshData(silencioso);
     }
 
     const rutinasPorDni = {};
@@ -1121,7 +1137,55 @@
       })),
     };
     if (registrosProRes.error) console.warn('Tabla registros_pro no disponible:', registrosProRes.error.message || registrosProRes.error);
+    ultimaLectura = Date.now();
+    // El cliente que tiene la sesión abierta pasa a ser el de los datos nuevos
+    // (si el administrador le cambió el plan, el estado o una rutina, lo ve).
+    if (state.cliente) state.cliente = state.data.clientes.find(c => c.dni === state.cliente.dni) || state.cliente;
   }
+
+  // ---------------- Actualización por detrás ----------------
+  // La app vuelve a leer la base al cambiar de pestaña y al volver a primer
+  // plano, sin frenar la pantalla. Como máximo una vez cada REFRESCO_MINIMO_MS.
+  const REFRESCO_MINIMO_MS = 10000;
+  let diaDibujado = null; // día en que se dibujó la pantalla por última vez
+
+  // true si hay algo escrito o elegido en un formulario de la pantalla: en ese
+  // caso no se redibuja, para no borrar lo que la persona está cargando.
+  function hayAlgoEscrito() {
+    const activo = document.activeElement;
+    if (activo && /^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName)) return true;
+    return Array.from(document.querySelectorAll('#root input, #root textarea, #root select')).some(el => {
+      if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+      if (el.tagName === 'SELECT') {
+        const porDefecto = Array.from(el.options).findIndex(o => o.defaultSelected);
+        return el.selectedIndex !== (porDefecto === -1 ? 0 : porDefecto);
+      }
+      return el.value !== el.defaultValue;
+    });
+  }
+
+  async function actualizarPorDetras() {
+    if (!state.data) return;
+    const hoy = isoDate(new Date());
+    const cambioElDia = !!diaDibujado && diaDibujado !== hoy;
+    if (!cambioElDia && Date.now() - ultimaLectura < REFRESCO_MINIMO_MS) return;
+    ultimaLectura = Date.now();
+    const antes = JSON.stringify(state.data);
+    await refreshData(true);
+    if (!cambioElDia && JSON.stringify(state.data) === antes) return; // nada nuevo
+    if (hayAlgoEscrito()) return; // los datos ya están; se ven en el próximo toque
+    // Si la app quedó abierta de un día para el otro, no dejar elegido un día que ya pasó
+    if (state.cliente && state.selectedDate && state.selectedDate < hoy) state.selectedDate = primerDiaConTurnos();
+    // Los desplegables que estaban abiertos (historial de pagos, "Al día") siguen abiertos
+    const abiertos = Array.from(document.querySelectorAll('#root details')).map(d => d.open);
+    renderApp();
+    const nuevos = document.querySelectorAll('#root details');
+    if (nuevos.length === abiertos.length) nuevos.forEach((d, i) => { if (abiertos[i]) d.open = true; });
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') actualizarPorDetras();
+  });
 
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -1886,7 +1950,7 @@
       renderApp();
       window.scrollTo(0, state.listaScrollY || 0);
     });
-    on('[data-ficha-tab]', el => { abrirFicha(state.fichaDni, el.dataset.fichaTab); renderApp(); });
+    on('[data-ficha-tab]', el => { abrirFicha(state.fichaDni, el.dataset.fichaTab); renderApp(); actualizarPorDetras(); });
     on('[data-ir-tab]', el => { abrirFicha(state.fichaDni, el.dataset.irTab); renderApp(); window.scrollTo(0, 0); });
     on('#cancelEditBtn', () => { abrirFicha(state.fichaDni, 'resumen'); renderApp(); window.scrollTo(0, 0); });
 
@@ -2968,6 +3032,7 @@
 
   function renderApp() {
     const root = document.getElementById('root');
+    diaDibujado = isoDate(new Date());
 
     if (state.mode === 'adminPin') {
       root.innerHTML = renderAdminPin(state.pinError);
@@ -2986,6 +3051,7 @@
           state.fichaOrigen = 'clientes';
           state.adminTab = btn.dataset.adminTab;
           renderApp();
+          actualizarPorDetras();
         };
       });
 
@@ -3007,6 +3073,7 @@
           abrirFicha(btn.dataset.fichaDni, 'resumen');
           renderApp();
           window.scrollTo(0, 0);
+          actualizarPorDetras();
         };
       });
 
@@ -3113,6 +3180,7 @@
         // Si la app quedó abierta de un día para el otro, no dejar seleccionado un día que ya pasó
         if (state.view === 'turnos' && state.selectedDate < isoDate(new Date())) state.selectedDate = primerDiaConTurnos();
         renderApp();
+        actualizarPorDetras();
       };
     });
 
@@ -3234,9 +3302,21 @@
     renderApp();
   }
 
+  let ingresoEnCurso = false;
   async function onLogin() {
+    if (ingresoEnCurso) return;
+    ingresoEnCurso = true;
+    try { await ingresar(); } finally { ingresoEnCurso = false; }
+  }
+
+  async function ingresar() {
     const dni = document.getElementById('dniInput').value.trim();
     const pass = document.getElementById('passInput').value;
+    const btn = document.getElementById('loginBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Ingresando…'; }
+    // Se vuelve a leer la base antes de entrar: así un cliente recién cargado
+    // (o con la contraseña recién cambiada) entra aunque tuviera la página abierta.
+    await refreshData();
     const found = state.data.clientes.find(c => c.dni === dni);
     if (!found) {
       state.loginError = 'No encontramos ese DNI. Verificalo o hablá con recepción.';
@@ -3278,6 +3358,7 @@
       renderApp();
       return;
     }
+    await refreshData(); // administración siempre arranca con los datos del momento
     state.pinError = '';
     state.adminFormError = '';
     state.adminFormNotice = '';
