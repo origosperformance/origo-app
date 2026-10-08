@@ -822,7 +822,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '8/10/2026 · 25';
+  const VERSION_APP = '8/10/2026 · 26';
 
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
@@ -3764,7 +3764,7 @@
     { nombre: 'Tarde',  desde: 13, hasta: 18 },
     { nombre: 'Noche',  desde: 19, hasta: 23 },
   ];
-  // Con esta cantidad de lugares libres (o menos) el horario se marca "Quedan N"
+  // Con esta cantidad de lugares libres (o menos) el horario se marca en ámbar ("últimos lugares")
   const POCOS_LUGARES = 2;
 
   function fechaCompleta(iso) {
@@ -3824,7 +3824,8 @@
       else if (libres <= 0) { clase = 'lleno'; sub = 'Completo'; apagado = true; }
       else {
         clase = libres <= POCOS_LUGARES ? 'pocos' : 'libre';
-        sub = libres <= POCOS_LUGARES ? (libres === 1 ? 'Queda 1' : 'Quedan ' + libres) : '';
+        // Los lugares libres se ven siempre, sin tener que tocar el horario
+        sub = libres === 1 ? '1 lugar' : libres + ' lugares';
         if (!puedeReservar) { clase += ' nodisp'; apagado = true; }
       }
       return `<button class="slot ${clase} ${state.slotElegido === hora ? 'elegido' : ''}" data-slot="${hora}" data-libres="${Math.max(0, libres)}" ${apagado ? 'disabled' : ''}>
