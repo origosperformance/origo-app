@@ -822,7 +822,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '7/10/2026 · 24';
+  const VERSION_APP = '8/10/2026 · 25';
 
   const CUPO = 6;
   const MAX_TURNOS_POR_DIA = 2;
@@ -2103,7 +2103,7 @@
   function formClienteHtml(editing, formError) {
     return `
           <div class="admin-field-grid">
-            <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?editing.dni:''}" ${editing?'disabled':''}></label>
+            <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?esc(editing.dni):''}" autocomplete="off"></label>
             <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
             <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?esc(editing.nombre):''}"></label>
             <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?esc(editing.email||''):''}"></label>
@@ -4545,10 +4545,180 @@
     el.scrollIntoView({ block: 'center' });
   }
 
+  // ---------------- Cambio de DNI ----------------
+  // El DNI es la llave del cliente: sus turnos, pagos, rutinas y registros del
+  // control diario están guardados con ese número. Para cambiarlo sin perder
+  // nada se hace en este orden: 1) se crea la ficha con el DNI nuevo, 2) se le
+  // pasa todo lo suyo, tabla por tabla, comprobando en la base que pasó, y
+  // 3) recién al final se borra la ficha con el DNI anterior. Si algo falla en
+  // el camino se deshace lo hecho y el cliente queda como estaba. Y si se corta
+  // justo en el medio (se cierra la app, se cae internet), volver a guardar el
+  // mismo cambio lo termina: la ficha a medio pasar se reconoce porque tiene la
+  // misma contraseña protegida, que es única de cada cliente.
+  const TABLAS_CON_DNI = { reservas: 'los turnos', registros_pro: 'los registros del control diario', pagos: 'los pagos', rutinas: 'las rutinas' };
+  // Tablas en las que, si la base no deja modificar una fila, se la puede pasar
+  // copiándola y borrando la original (la app ya agrega y borra filas ahí).
+  const TABLAS_COPIABLES = { registros_pro: true, pagos: true, rutinas: true };
+
+  // Cuántas filas de una tabla tiene un DNI, mirado en la base en este momento (null = no se pudo saber)
+  async function contarConDni(tabla, dni) {
+    try {
+      const r = await sb.from(tabla).select('id', { count: 'exact', head: true }).eq('dni', dni);
+      if (!r.error && typeof r.count === 'number') return r.count;
+    } catch (e) {}
+    try {
+      const r = await sb.from(tabla).select('id').eq('dni', dni);
+      return (r.error || !r.data) ? null : r.data.length;
+    } catch (e) { return null; }
+  }
+
+  // Id de la copia de una fila al pasarla de un DNI a otro. Ida y vuelta dan el
+  // id original, así repetir el cambio nunca duplica filas.
+  function idEspejo(id, desde, hasta) {
+    id = String(id);
+    const prefijo = 'pago-' + desde + '-';
+    if (id.startsWith(prefijo)) return 'pago-' + hasta + '-' + id.slice(prefijo.length);
+    return id.endsWith('-m') ? id.slice(0, -2) : id + '-m';
+  }
+
+  async function borrarPorIds(tabla, ids) {
+    let ok = true;
+    for (let i = 0; i < ids.length; i += 40) {
+      const r = await sb.from(tabla).delete().in('id', ids.slice(i, i + 40));
+      if (r.error) ok = false;
+    }
+    return ok;
+  }
+
+  // Pasa las filas de una tabla de un DNI a otro. Devuelve { ok, deshacer }:
+  // "deshacer" (si viene) las devuelve al DNI de origen.
+  async function moverTablaDni(tabla, desde, hasta) {
+    const antes = await contarConDni(tabla, desde);
+    if (antes === null) return { ok: false };
+    if (antes === 0) return { ok: true };
+    const volver = async () => {
+      const r = await sb.from(tabla).update({ dni: desde }).eq('dni', hasta);
+      return !r.error && (await contarConDni(tabla, hasta)) === 0;
+    };
+    const r = await sb.from(tabla).update({ dni: hasta }).eq('dni', desde);
+    // No alcanza con que no haya dado error: si la base no deja modificar esa
+    // tabla, contesta "bien" sin cambiar nada. Se comprueba que no quedó ninguna.
+    const quedan = await contarConDni(tabla, desde);
+    if (quedan === 0) return { ok: true, deshacer: volver };
+    if (quedan === null || quedan !== antes) return { ok: false, deshacer: volver };
+    if (r.error) console.error('No se pudo pasar ' + tabla + ' al DNI nuevo:', r.error);
+    if (!TABLAS_COPIABLES[tabla]) return { ok: false };
+
+    // Plan B: copiar las filas con el DNI nuevo y borrar las originales
+    const viejas = await sb.from(tabla).select('*').eq('dni', desde);
+    const yaEstan = await sb.from(tabla).select('id').eq('dni', hasta);
+    if (viejas.error || !viejas.data || yaEstan.error || !yaEstan.data || viejas.data.length !== antes) return { ok: false };
+    const idsYa = {};
+    yaEstan.data.forEach(f => { idsYa[String(f.id)] = true; });
+    const copias = viejas.data.map(f => ({ ...f, id: idEspejo(f.id, desde, hasta), dni: hasta })).filter(f => !idsYa[f.id]);
+    if (copias.length) {
+      const ins = await sb.from(tabla).insert(copias);
+      if (ins.error) { console.error('No se pudo copiar ' + tabla + ':', ins.error); return { ok: false }; }
+    }
+    const idsCopias = copias.map(f => f.id);
+    if ((await contarConDni(tabla, hasta)) !== yaEstan.data.length + copias.length) {
+      await borrarPorIds(tabla, idsCopias);
+      return { ok: false };
+    }
+    await sb.from(tabla).delete().eq('dni', desde);
+    if ((await contarConDni(tabla, desde)) !== 0) {
+      await borrarPorIds(tabla, idsCopias); // no se pudieron borrar las originales: se sacan las copias
+      return { ok: false };
+    }
+    return { ok: true, deshacer: async () => {
+      const ins = await sb.from(tabla).insert(viejas.data);
+      if (ins.error) return false;
+      return await borrarPorIds(tabla, idsCopias);
+    } };
+  }
+
+  // Cambia el DNI de un cliente y guarda de paso el resto de sus datos
+  // ("candidato"). Devuelve { ok: true, aviso } o { ok: false, mensaje }.
+  async function cambiarDniCliente(dniViejo, dniNuevo, candidato) {
+    const falla = (mensaje) => ({ ok: false, mensaje });
+    const NADA = ' No se cambió nada.';
+    const tablas = Object.keys(TABLAS_CON_DNI).filter(t => t !== 'registros_pro' || state.data.registrosProListo);
+
+    // Las dos fichas, leídas en este momento
+    const origen = await sb.from('clientes').select('*').eq('dni', dniViejo);
+    const destino = await sb.from('clientes').select('*').eq('dni', dniNuevo);
+    if (origen.error || !origen.data || destino.error || !destino.data) return falla('No se pudo leer al cliente. Revisá la conexión y probá de nuevo.' + NADA);
+    if (origen.data.length !== 1) return falla('No se encontró al cliente con DNI ' + dniViejo + '. Volvé a abrir su ficha.' + NADA);
+    const filaVieja = origen.data[0];
+    const retoma = destino.data.length === 1 && esPasswordHasheada(filaVieja.password) && destino.data[0].password === filaVieja.password;
+    if (destino.data.length && !retoma) return falla('Ya existe otro cliente con ese DNI.');
+    if (!retoma) {
+      // Un DNI que quedó con historial de un cliente eliminado no se reutiliza: se mezclarían los dos
+      for (const t of tablas) {
+        const n = await contarConDni(t, dniNuevo);
+        if (n === null) return falla('No se pudo comprobar el DNI nuevo. Revisá la conexión y probá de nuevo.' + NADA);
+        if (n > 0) return falla(`Con el DNI ${dniNuevo} siguen guardados en la base ${TABLAS_CON_DNI[t]} de un cliente que se eliminó, y se mezclarían con los de ${candidato.nombre}.` + NADA);
+      }
+    }
+
+    // 1) Ficha con el DNI nuevo (con todos los datos que tenía la anterior)
+    const datos = { ...clienteJsToDb(candidato), dni: dniNuevo };
+    const deshacer = [];
+    if (retoma) {
+      const r = await sb.from('clientes').update(datos).eq('dni', dniNuevo);
+      if (r.error) return falla('No se pudo guardar (' + r.error.message + ')');
+    } else {
+      let r = await sb.from('clientes').insert({ ...filaVieja, ...datos });
+      if (r.error) r = await sb.from('clientes').insert(datos);
+      if (r.error) return falla('No se pudo guardar el DNI nuevo (' + r.error.message + ').' + NADA);
+      deshacer.push(async () => !(await sb.from('clientes').delete().eq('dni', dniNuevo)).error);
+    }
+
+    // 2) Todo lo del cliente pasa al DNI nuevo
+    const pasarTodo = async () => {
+      for (const t of tablas) {
+        const res = await moverTablaDni(t, dniViejo, dniNuevo);
+        if (res.deshacer) deshacer.push(res.deshacer);
+        if (!res.ok) return t;
+      }
+      return null;
+    };
+    let fallo = await pasarTodo();
+    if (fallo) {
+      let limpio = true;
+      for (const paso of deshacer.reverse()) {
+        // si no se pudo devolver algo, no se borra la ficha nueva (ahí siguen esos datos)
+        if (!limpio) break;
+        try { limpio = await paso(); } catch (e) { limpio = false; }
+      }
+      return falla(limpio && !retoma
+        ? `No se pudieron pasar ${TABLAS_CON_DNI[fallo]} al DNI nuevo, así que se dejó todo como estaba. Probá de nuevo.`
+        : `El cambio quedó a medias: ${candidato.nombre} figura con los dos DNI (${dniViejo} y ${dniNuevo}). No borres ninguna de las dos fichas: abrí la del DNI ${dniViejo} y volvé a guardar el cambio para terminarlo.`);
+    }
+
+    // 3) Se borra la ficha anterior, comprobando antes que ya no le quede nada
+    //    (por si el cliente reservó un turno justo en el medio)
+    let quedaAlgo = false;
+    for (const t of tablas) { if ((await contarConDni(t, dniViejo)) !== 0) quedaAlgo = true; }
+    if (quedaAlgo) { fallo = await pasarTodo(); quedaAlgo = !!fallo; }
+    let borrada = false;
+    if (!quedaAlgo) {
+      await sb.from('clientes').delete().eq('dni', dniViejo);
+      const sigue = await sb.from('clientes').select('dni').eq('dni', dniViejo);
+      borrada = !sigue.error && !!sigue.data && sigue.data.length === 0;
+    }
+    return { ok: true, aviso: borrada ? '' : ` Ojo: la ficha con el DNI anterior (${esc(dniViejo)}) no se pudo borrar y quedó duplicada. Abrila y volvé a guardar el cambio de DNI para terminarlo.` };
+  }
+
   async function onAddCliente() {
     const dniField = document.getElementById('fDni');
-    // En un cliente nuevo el DNI se guarda sin puntos ni espacios
-    const dni = state.editingDni || dniField.value.trim().replace(/[.\s]/g, '');
+    // El DNI se guarda sin puntos ni espacios. Al editar solo cuenta como
+    // cambio si de verdad se tocó el campo (un DNI viejo cargado con puntos no
+    // se "corrige" solo por guardar otro dato).
+    const dniEscrito = dniField.value.trim();
+    const dniLimpio = dniEscrito.replace(/[.\s]/g, '');
+    const cambiaDni = !!state.editingDni && dniEscrito !== state.editingDni && dniLimpio !== state.editingDni;
+    const dni = (state.editingDni && !cambiaDni) ? state.editingDni : dniLimpio;
     const password = document.getElementById('fPass').value.trim();
     const nombre = document.getElementById('fNombre').value.trim();
     const email = document.getElementById('fEmail').value.trim();
@@ -4596,26 +4766,60 @@
     };
 
     if (state.editingDni) {
-      const cActual = state.data.clientes.find(x => x.dni === state.editingDni);
+      const dniAnterior = state.editingDni;
+      const cActual = state.data.clientes.find(x => x.dni === dniAnterior);
+      // (una ficha con ese DNI que es copia de ésta es un cambio que quedó a medias: se deja pasar para terminarlo)
+      const esCopiaAMedias = (c) => c.dni === dni && esPasswordHasheada(c.password) && c.password === cActual.password;
+      if (cambiaDni && state.data.clientes.some(c => c.dni !== dniAnterior && !esCopiaAMedias(c) &&
+          (c.dni === dni || (soloDigitos(dni) && soloDigitos(c.dni) === soloDigitos(dni))))) {
+        errorFormCliente('Ya existe otro cliente con ese DNI.');
+        return;
+      }
       const estadoAnterior = cActual.estado;
       const nuevoPassword = password ? await hashPassword(password) : cActual.password;
       const candidato = { ...cActual, ...datosComunes, password: nuevoPassword };
       const nota = aplicarTransicionEstado(candidato, estadoAnterior, estado);
-      const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', state.editingDni);
-      if (error) { errorFormCliente('No se pudo guardar (' + error.message + ')'); return; }
-      const dniEditado = state.editingDni;
-      const eraPrueba = esPrueba(dniEditado);
-      const cuotaAntes = cuotaEspecialDe(dniEditado);
+      const eraPrueba = esPrueba(dniAnterior);
+      const cuotaAntes = cuotaEspecialDe(dniAnterior);
+      let notaDni = '';
+      if (cambiaDni) {
+        // El DNI es la llave del cliente: se muda con todo lo suyo (ver cambiarDniCliente)
+        const btn = document.getElementById('addClienteBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Cambiando el DNI…'; }
+        let res;
+        try { res = await cambiarDniCliente(dniAnterior, dni, candidato); }
+        catch (e) { console.error(e); res = { ok: false, mensaje: 'Se cortó la conexión mientras se cambiaba el DNI. Revisá cómo quedó el cliente y volvé a guardar.' }; }
+        if (!res.ok) {
+          await refreshData();
+          if (btn) { btn.disabled = false; btn.textContent = 'Guardar cambios'; }
+          errorFormCliente(res.mensaje);
+          return;
+        }
+        state.editingDni = dni;
+        state.fichaDni = dni;
+        await refreshData(); // la marca de prueba y la cuota especial se pasan mirando lo que hay ahora
+        notaDni = ` El DNI pasó de ${esc(dniAnterior)} a ${esc(dni)}: desde ahora entra a la app con el nuevo (la contraseña es la misma) y conserva sus turnos, pagos y rutinas.${res.aviso || ''}`;
+      } else {
+        const { error } = await sb.from('clientes').update(clienteJsToDb(candidato)).eq('dni', dniAnterior);
+        if (error) { errorFormCliente('No se pudo guardar (' + error.message + ')'); return; }
+      }
+      const dniEditado = dni;
       await guardarMarcaPrueba(dniEditado, marcarPrueba);
       await guardarCuotaEspecial(dniEditado, cuotaEspecial);
+      if (cambiaDni) {
+        // Lo que estaba anotado con el DNI anterior se quita, para que no lo herede nadie
+        await guardarMarcaPrueba(dniAnterior, false);
+        await guardarCuotaEspecial(dniAnterior, null);
+      }
       await refreshData();
       // Se confirma contra lo que realmente quedó guardado en la base
       const okMarca = esPrueba(dniEditado) === marcarPrueba;
       state.adminFormError = '';
-      state.adminFormNotice = `${esc(nombre)} se actualizó correctamente.${nota}${
+      state.adminFormNotice = `${esc(nombre)} se actualizó correctamente.${notaDni}${nota}${
         !okMarca ? notaPrueba(false) : (marcarPrueba !== eraPrueba ? (marcarPrueba ? ' Quedó como usuario de prueba.' : ' Dejó de ser usuario de prueba.') : '')}${
         notaCuota(cuotaEspecialDe(dniEditado) === cuotaEspecial, cuotaAntes)}`;
       renderApp();
+      window.scrollTo(0, 0); // el aviso de "Listo" está arriba del formulario
       return;
     }
 
