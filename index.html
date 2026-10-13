@@ -634,7 +634,36 @@
   .turnos-estado { font-size: 13px; color: var(--text-muted); margin: 0 0 4px; line-height: 1.45; }
   .turnos-estado.aviso { color: var(--amber); }
   .slots-grupo { font-size: 13px; color: var(--text-muted); margin: 18px 0 8px; }
-  .slots-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .slots-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .slots-grid .slot .h { font-size: clamp(17px, 5.4vw, 22px); }
+  /* Horarios en lista: uno debajo del otro, con la ocupación como barra */
+  .slots-lista { display: flex; flex-direction: column; gap: 6px; }
+  .slot-fila {
+    display: grid; grid-template-columns: 58px 1fr 84px 14px; align-items: center; gap: 12px;
+    width: 100%; min-height: 48px; padding: 8px 12px 8px 14px; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text);
+    font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  .slot-fila .sf-hora { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 20px; font-weight: 600; line-height: 1; }
+  .slot-fila .sf-barra { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .slot-fila .sf-barra i { display: block; height: 100%; background: var(--text-muted); border-radius: 3px; }
+  .slot-fila .sf-estado { font-size: 12px; color: var(--text-muted); white-space: nowrap; text-align: right; }
+  .slot-fila .sf-chev { display: flex; color: var(--text-muted); opacity: 0.6; }
+  .slot-fila .sf-chev svg { width: 14px; height: 14px; }
+  .slot-fila.pocos { border-color: rgba(242,169,59,0.5); }
+  .slot-fila.pocos .sf-estado { color: var(--amber); }
+  .slot-fila.pocos .sf-barra i { background: var(--amber); }
+  .slot-fila.lleno { opacity: 0.45; }
+  .slot-fila.lleno .sf-barra i { background: var(--red); }
+  .slot-fila.nodisp { opacity: 0.55; }
+  .slot-fila.mio { background: var(--green); border-color: var(--green); }
+  .slot-fila.mio .sf-estado, .slot-fila.mio .sf-chev { color: #DCE7FF; }
+  .slot-fila.mio .sf-barra { background: rgba(255,255,255,0.22); }
+  .slot-fila.mio .sf-barra i { background: #fff; }
+  .slot-fila.elegido { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); opacity: 1; }
+  .slot-fila.mio.elegido { box-shadow: inset 0 0 0 2px #F3F6F1; }
+  .slot-fila:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   .slot {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 12px 4px 9px; min-height: 66px; text-align: center; color: var(--text); cursor: pointer;
@@ -645,8 +674,9 @@
   .slot .s { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; min-height: 14px; }
   .slot.pocos { border-color: rgba(242,169,59,0.5); }
   .slot.pocos .s { color: var(--amber); }
-  .slot.lleno { opacity: 0.4; cursor: default; }
-  .slot.nodisp { opacity: 0.5; cursor: default; }
+  .slot.lleno { opacity: 0.4; }
+  .slot.nodisp { opacity: 0.5; }
+  .slot.lleno.elegido, .slot.nodisp.elegido { opacity: 0.8; }
   .slot.mio { background: var(--green); border-color: var(--green); }
   .slot.mio .s { color: #DCE7FF; }
   .slot.elegido { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); }
@@ -661,13 +691,20 @@
   /* Barra para confirmar el horario elegido: queda pegada arriba del menú */
   .turno-barra {
     position: sticky; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 4;
-    margin: 0 12px 8px; padding: 12px 12px 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin: 0 12px 8px; padding: 12px 12px 12px 16px;
     background: var(--surface-2); border: 1px solid var(--green); border-radius: var(--radius);
     box-shadow: 0 10px 28px rgba(0,0,0,0.5);
   }
   .turno-barra .tb1 { font-size: 15px; font-weight: 600; }
   .turno-barra .tb2 { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
   .turno-barra .btn { padding: 12px 16px; font-size: 14px; white-space: nowrap; }
+  .turno-barra .tb-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .turno-barra .tb2.aviso { color: var(--amber); }
+  .turno-barra .tb-anotados { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .turno-barra .tb-titulo { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .turno-barra .tb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .turno-barra .tb-chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+  .turno-barra .tb-chip.yo { border-color: var(--green); color: var(--text); }
 
   /* ---------- Mis reservas: próximo turno ---------- */
   .prox {
@@ -822,9 +859,9 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '8/10/2026 · 26';
+  const VERSION_APP = '13/10/2026 · 28';
 
-  const CUPO = 6;
+  const CUPO = 4; // personas por turno
   const MAX_TURNOS_POR_DIA = 2;
   // Minutos de tolerancia después de la hora de inicio durante los que un turno
   // todavía se puede reservar/cancelar. 0 = se cierra en punto.
@@ -986,7 +1023,28 @@
         <div><h2>${titulo}</h2><p class="sub">${sub}</p></div>
       </div>`;
   }
-  const HORARIOS = Array.from({length: 13}, (_, i) => String(i + 8).padStart(2,'0') + ':00');
+  // ---------------- Horarios de los turnos ----------------
+  // Un turno empieza cada MINUTOS_ENTRE_TURNOS, del PRIMER_TURNO al ULTIMO_TURNO
+  // (horas de inicio). Cada turno dura DURACION_TURNO_MIN, así que dos horarios
+  // seguidos se pisan (el de 8:00 y el de 8:30 comparten media hora): cada uno
+  // tiene su propio cupo, pero un cliente no puede anotarse en dos que se pisen.
+  const PRIMER_TURNO = '08:00';
+  const ULTIMO_TURNO = '20:00';
+  const MINUTOS_ENTRE_TURNOS = 30;
+  const DURACION_TURNO_MIN = 60;
+  function minutosDe(hora) {
+    const [h, m] = String(hora).split(':');
+    return parseInt(h, 10) * 60 + (parseInt(m, 10) || 0);
+  }
+  function horaDeMinutos(min) {
+    return String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+  }
+  const HORARIOS = [];
+  for (let m = minutosDe(PRIMER_TURNO); m <= minutosDe(ULTIMO_TURNO); m += MINUTOS_ENTRE_TURNOS) HORARIOS.push(horaDeMinutos(m));
+  // true si dos turnos distintos del mismo día se pisan en el tiempo
+  function seSuperponen(hora1, hora2) {
+    return hora1 !== hora2 && Math.abs(minutosDe(hora1) - minutosDe(hora2)) < DURACION_TURNO_MIN;
+  }
   const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const DIAS_CORTO = ['dom','lun','mar','mié','jue','vie','sáb'];
 
@@ -3253,7 +3311,9 @@
           const limite = limiteSemanalDe(c);
           const enSemana = reservasEnSemana(data, c.dni, fecha).length;
           const enDia = delDia.filter(r => r.dni === c.dni).length;
-          const aviso = enDia >= MAX_TURNOS_POR_DIA ? `ya tiene ${enDia} turnos este día`
+          const pisa = delDia.find(r => r.dni === c.dni && seSuperponen(r.hora, hora));
+          const aviso = pisa ? `ya tiene turno a las ${pisa.hora} (se pisan)`
+            : enDia >= MAX_TURNOS_POR_DIA ? `ya tiene ${enDia} turnos este día`
             : (isFinite(limite) && enSemana >= limite) ? `ya usó sus ${limite} turnos de la semana` : '';
           return `<button class="anotar-op" data-anotar-dni="${c.dni}" data-buscar="${esc(c.nombre.toLowerCase())} ${c.dni}">
                     <span>${esc(c.nombre)}</span><small class="${aviso ? 'aviso' : ''}">${aviso || esc(c.plan)}</small>
@@ -3766,6 +3826,34 @@
   ];
   // Con esta cantidad de lugares libres (o menos) el horario se marca en ámbar ("últimos lugares")
   const POCOS_LUGARES = 2;
+  // Cómo se muestran los horarios al cliente: 'grilla' (casilleros) o 'lista' (uno debajo del otro)
+  const DISPOSICION_TURNOS = 'grilla';
+
+  // Por qué el cliente no puede reservar ese horario (null = puede)
+  function motivoNoReservar(cliente, data, fecha, hora) {
+    if (cliente.estado !== 'Activo') return 'Tu membresía no está activa';
+    if (cuotaImpideReservar(data, cliente.dni)) return 'Tenés la cuota vencida';
+    const mias = data.reservas.filter(r => r.dni === cliente.dni && r.fecha === fecha && r.estado !== 'cancelado');
+    const choca = mias.find(r => seSuperponen(r.hora, hora));
+    if (choca) return 'Se superpone con tu turno de las ' + choca.hora;
+    if (mias.length >= MAX_TURNOS_POR_DIA) return 'Ya tenés ' + MAX_TURNOS_POR_DIA + ' turnos este día';
+    if (reservasEnSemana(data, cliente.dni, fecha).length >= limiteSemanalDe(cliente)) return 'Ya usaste tus turnos de la semana';
+    return null;
+  }
+
+  // Quiénes van a un turno, para que el cliente lo vea al tocar el horario.
+  // Uno mismo aparece primero como "Vos"; los demás por orden de reserva. Los
+  // usuarios de prueba no figuran para los demás (tampoco ocupan lugar).
+  function anotadosEnTurno(data, fecha, hora, dniQueMira) {
+    return data.reservas
+      .filter(r => r.fecha === fecha && r.hora === hora && r.estado !== 'cancelado' && (!esPrueba(r.dni) || r.dni === dniQueMira))
+      .sort((a, b) => (b.dni === dniQueMira) - (a.dni === dniQueMira) || (a.creadoEn || 0) - (b.creadoEn || 0))
+      .map(r => {
+        if (r.dni === dniQueMira) return { nombre: 'Vos', yo: true };
+        const c = data.clientes.find(x => x.dni === r.dni);
+        return { nombre: c ? c.nombre : 'Otro cliente', yo: false };
+      });
+  }
 
   function fechaCompleta(iso) {
     const d = new Date(iso + 'T00:00:00');
@@ -3811,30 +3899,52 @@
       const quedan = limiteSemanal - usadosSemana;
       estadoHtml = `<p class="turnos-estado">${quedan === 1 ? 'Te queda 1 turno' : 'Te quedan ' + quedan + ' turnos'} para reservar esta semana.</p>`;
     } else {
-      estadoHtml = `<p class="turnos-estado">Tocá un horario para reservarlo.</p>`;
+      estadoHtml = `<p class="turnos-estado">Tocá un horario para reservarlo y ver quién va.</p>`;
     }
 
     // Los horarios que ya empezaron no se muestran (solo afecta al día de hoy)
     const visibles = HORARIOS.filter(h => !turnoYaEmpezo(selectedDate, h));
-    const boton = (hora) => {
-      const libres = CUPO - ocupadosEnTurno(data, selectedDate, hora, cliente.dni);
+    // Todos los horarios se pueden tocar, aunque estén completos: así se ve quién va
+    const infoSlot = (hora) => {
+      const ocupados = ocupadosEnTurno(data, selectedDate, hora, cliente.dni);
+      const libres = CUPO - ocupados;
       const mia = misDelDia.some(r => r.hora === hora);
-      let clase, sub, apagado = false;
+      let clase, sub;
       if (mia) { clase = 'mio'; sub = 'Tu turno'; }
-      else if (libres <= 0) { clase = 'lleno'; sub = 'Completo'; apagado = true; }
+      else if (libres <= 0) { clase = 'lleno'; sub = 'Completo'; }
       else {
         clase = libres <= POCOS_LUGARES ? 'pocos' : 'libre';
         // Los lugares libres se ven siempre, sin tener que tocar el horario
         sub = libres === 1 ? '1 lugar' : libres + ' lugares';
-        if (!puedeReservar) { clase += ' nodisp'; apagado = true; }
+        // (en la grilla no entra "Se superpone" en una línea)
+        if (misDelDia.some(r => seSuperponen(r.hora, hora))) { clase += ' nodisp'; sub = DISPOSICION_TURNOS === 'lista' ? 'Se superpone' : 'Se pisa'; }
+        else if (!puedeReservar) clase += ' nodisp';
       }
-      return `<button class="slot ${clase} ${state.slotElegido === hora ? 'elegido' : ''}" data-slot="${hora}" data-libres="${Math.max(0, libres)}" ${apagado ? 'disabled' : ''}>
-                <span class="h">${hora}</span><span class="s">${sub}</span>
+      return { clase, sub, ocupados, elegido: state.slotElegido === hora ? 'elegido' : '' };
+    };
+    const casillero = (hora) => {
+      const i = infoSlot(hora);
+      return `<button class="slot ${i.clase} ${i.elegido}" data-slot="${hora}">
+                <span class="h">${hora}</span><span class="s">${i.sub}</span>
               </button>`;
     };
+    const renglon = (hora) => {
+      const i = infoSlot(hora);
+      const pct = Math.min(100, Math.round(i.ocupados / CUPO * 100));
+      return `<button class="slot-fila ${i.clase} ${i.elegido}" data-slot="${hora}">
+                <span class="sf-hora">${hora}</span>
+                <span class="sf-barra" aria-hidden="true"><i style="width:${pct}%"></i></span>
+                <span class="sf-estado">${i.sub}</span>
+                <span class="sf-chev" aria-hidden="true">${ICONOS.der}</span>
+              </button>`;
+    };
+    const enLista = DISPOSICION_TURNOS === 'lista';
     const grupos = FRANJAS.map(f => {
       const horas = visibles.filter(h => { const n = parseInt(h, 10); return n >= f.desde && n <= f.hasta; });
-      return horas.length ? `<div class="slots-grupo">${f.nombre}</div><div class="slots-grid">${horas.map(boton).join('')}</div>` : '';
+      if (!horas.length) return '';
+      return `<div class="slots-grupo">${f.nombre}</div>` + (enLista
+        ? `<div class="slots-lista">${horas.map(renglon).join('')}</div>`
+        : `<div class="slots-grid">${horas.map(casillero).join('')}</div>`);
     }).join('');
     const quedanOtrosDias = fullBookableWeek().some(d => isoDate(d) > selectedDate);
 
@@ -3856,27 +3966,39 @@
     `;
   }
 
-  // Barra que aparece al tocar un horario: recién ahí se confirma la reserva (o la cancelación)
+  // Barra que aparece al tocar un horario: muestra quién está anotado y desde
+  // ahí se confirma la reserva (o la cancelación)
   function barraTurno(cliente, data) {
     const hora = state.slotElegido;
     const fecha = state.selectedDate;
     if (!hora || state.view !== 'turnos' || turnoYaEmpezo(fecha, hora)) return '';
     const d = new Date(fecha + 'T00:00:00');
     const cuando = DIAS_SEMANA[d.getDay()] + ' ' + d.getDate() + ' a las ' + hora;
-    const mia = data.reservas.find(r => r.dni === cliente.dni && r.fecha === fecha && r.hora === hora && r.estado !== 'cancelado');
-    if (mia) {
-      return `
-        <div class="turno-barra">
-          <div><div class="tb1">${cuando}</div><div class="tb2">Ya tenés este turno</div></div>
-          <button class="btn btn-ghost" id="cancelarTurnoBtn" data-id="${mia.id}">Cancelar turno</button>
+    const anotados = anotadosEnTurno(data, fecha, hora, cliente.dni);
+    const listaHtml = `
+        <div class="tb-anotados">
+          <div class="tb-titulo">${anotados.length ? `Anotados · ${anotados.length} de ${CUPO}` : 'Todavía no hay nadie anotado'}</div>
+          ${anotados.length ? `<div class="tb-chips">${anotados.map(a => `<span class="tb-chip ${a.yo ? 'yo' : ''}">${esc(a.nombre)}</span>`).join('')}</div>` : ''}
         </div>`;
+    const mia = data.reservas.find(r => r.dni === cliente.dni && r.fecha === fecha && r.hora === hora && r.estado !== 'cancelado');
+    let detalle, accion = '', aviso = false;
+    if (mia) {
+      detalle = 'Ya tenés este turno';
+      accion = `<button class="btn btn-ghost" id="cancelarTurnoBtn" data-id="${mia.id}">Cancelar turno</button>`;
+    } else {
+      const libres = CUPO - ocupadosEnTurno(data, fecha, hora, cliente.dni);
+      const motivo = libres <= 0 ? 'Turno completo' : motivoNoReservar(cliente, data, fecha, hora);
+      aviso = !!motivo;
+      detalle = motivo || (libres === 1 ? 'Queda 1 lugar' : 'Quedan ' + libres + ' lugares');
+      if (!motivo) accion = `<button class="btn btn-primary" id="confirmarTurnoBtn">Reservar turno</button>`;
     }
-    const libres = CUPO - ocupadosEnTurno(data, fecha, hora, cliente.dni);
-    if (libres <= 0) return '';
     return `
       <div class="turno-barra">
-        <div><div class="tb1">${cuando}</div><div class="tb2">${libres === 1 ? 'Queda 1 lugar' : 'Quedan ' + libres + ' lugares'}</div></div>
-        <button class="btn btn-primary" id="confirmarTurnoBtn">Reservar turno</button>
+        <div class="tb-fila">
+          <div><div class="tb1">${cuando}</div><div class="tb2 ${aviso ? 'aviso' : ''}">${detalle}</div></div>
+          ${accion}
+        </div>
+        ${listaHtml}
       </div>`;
   }
 
@@ -4331,7 +4453,7 @@
         dia.onclick = () => { state.selectedDate = dia.dataset.date; state.slotElegido = null; renderApp(); };
       });
       // Tocar un horario solo lo elige; se reserva (o cancela) desde la barra de abajo
-      root.querySelectorAll('.slot[data-slot]').forEach(btn => {
+      root.querySelectorAll('[data-slot]').forEach(btn => {
         btn.onclick = () => { state.slotElegido = state.slotElegido === btn.dataset.slot ? null : btn.dataset.slot; renderApp(); };
       });
       const confirmar = document.getElementById('confirmarTurnoBtn');
@@ -5052,6 +5174,11 @@
       showToast('Ya reservaste ' + MAX_TURNOS_POR_DIA + ' turnos ese día. Desmarcá uno primero.');
       return;
     }
+    const pisado = reservasHoy.find(r => seSuperponen(r.hora, hora));
+    if (pisado) {
+      showToast('Ese horario se superpone con tu turno de las ' + pisado.hora + '.');
+      return;
+    }
     const limiteSemanal = limiteSemanalDe(state.cliente);
     const reservasSemana = reservasEnSemana(state.data, state.cliente.dni, state.selectedDate);
     if (reservasSemana.length >= limiteSemanal) {
@@ -5067,6 +5194,13 @@
     if (antes.some(r => r.dni === dni && r.hora === hora && r.estado !== 'cancelado')) {
       await refreshData();
       showToast('Ya tenías reservado ese turno.');
+      renderApp();
+      return;
+    }
+    const pisadoEnBase = antes.find(r => r.dni === dni && r.estado !== 'cancelado' && seSuperponen(r.hora, hora));
+    if (pisadoEnBase) {
+      await refreshData();
+      showToast('Ese horario se superpone con tu turno de las ' + String(pisadoEnBase.hora).slice(0, 5) + '.');
       renderApp();
       return;
     }
