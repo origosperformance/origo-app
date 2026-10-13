@@ -639,7 +639,7 @@
   /* Horarios en lista: uno debajo del otro, con la ocupación como barra */
   .slots-lista { display: flex; flex-direction: column; gap: 6px; }
   .slot-fila {
-    display: grid; grid-template-columns: 58px 1fr 84px 14px; align-items: center; gap: 12px;
+    display: grid; grid-template-columns: 58px 1fr 100px 14px; align-items: center; gap: 12px;
     width: 100%; min-height: 48px; padding: 8px 12px 8px 14px; text-align: left; cursor: pointer;
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); color: var(--text);
     font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent;
@@ -671,7 +671,8 @@
     transition: border-color 0.12s ease, background 0.12s ease;
   }
   .slot .h { display: block; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 23px; font-weight: 600; line-height: 1.1; }
-  .slot .s { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; min-height: 14px; }
+  .slot .s { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; min-height: 14px; line-height: 1.25; }
+  .slot .s small { display: block; font-size: 10px; opacity: 0.85; }
   .slot.pocos { border-color: rgba(242,169,59,0.5); }
   .slot.pocos .s { color: var(--amber); }
   .slot.lleno { opacity: 0.4; }
@@ -859,7 +860,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '13/10/2026 · 28';
+  const VERSION_APP = '13/10/2026 · 29';
 
   const CUPO = 4; // personas por turno
   const MAX_TURNOS_POR_DIA = 2;
@@ -3914,18 +3915,20 @@
       else if (libres <= 0) { clase = 'lleno'; sub = 'Completo'; }
       else {
         clase = libres <= POCOS_LUGARES ? 'pocos' : 'libre';
-        // Los lugares libres se ven siempre, sin tener que tocar el horario
-        sub = libres === 1 ? '1 lugar' : libres + ' lugares';
+        // Se ve siempre cuántos hay anotados sobre el cupo ("2 de 4"), sin tener que tocar el horario
+        sub = ocupados + ' de ' + CUPO + ' anotados';
         // (en la grilla no entra "Se superpone" en una línea)
         if (misDelDia.some(r => seSuperponen(r.hora, hora))) { clase += ' nodisp'; sub = DISPOSICION_TURNOS === 'lista' ? 'Se superpone' : 'Se pisa'; }
         else if (!puedeReservar) clase += ' nodisp';
       }
-      return { clase, sub, ocupados, elegido: state.slotElegido === hora ? 'elegido' : '' };
+      // En la grilla no entra en una línea: el número arriba y "anotados" abajo
+      const subGrilla = /^\d+ de \d+ anotados$/.test(sub) ? sub.replace(' anotados', '<small>anotados</small>') : sub;
+      return { clase, sub, subGrilla, ocupados, elegido: state.slotElegido === hora ? 'elegido' : '' };
     };
     const casillero = (hora) => {
       const i = infoSlot(hora);
       return `<button class="slot ${i.clase} ${i.elegido}" data-slot="${hora}">
-                <span class="h">${hora}</span><span class="s">${i.sub}</span>
+                <span class="h">${hora}</span><span class="s">${i.subGrilla}</span>
               </button>`;
     };
     const renglon = (hora) => {
