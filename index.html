@@ -630,6 +630,7 @@
   .sem-dia.active .dow, .sem-dia.active .cuenta { color: #DCE7FF; }
   .sem-dia.active.conturno .marca { background: #F3F6F1; }
   .sem-dia.past { opacity: 0.35; cursor: default; }
+  .sem-titulo { font-size: 12px; color: var(--text-muted); margin: 0 0 6px; }
   .turnos-dia { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 19px; font-weight: 600; margin: 0 0 3px; }
   .turnos-estado { font-size: 13px; color: var(--text-muted); margin: 0 0 4px; line-height: 1.45; }
   .turnos-estado.aviso { color: var(--amber); }
@@ -860,7 +861,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '13/10/2026 · 29';
+  const VERSION_APP = '22/10/2026 · 30';
 
   const CUPO = 4; // personas por turno
   const MAX_TURNOS_POR_DIA = 2;
@@ -1101,23 +1102,51 @@
   ];
 
   // ---- Pagos "hasta fin de mes": sirven para que todos queden venciendo el día 1 ----
-  // Cubren desde la fecha base hasta el día 1 del mes siguiente. Se cobran por
-  // semanas: cada semana vale un cuarto de la cuota, redondeado a REDONDEO_SEMANAS.
-  // Para cambiar el redondeo o el valor de una semana alcanza con tocar acá.
-  const REDONDEO_SEMANAS = 500;
+  // Cubren desde la fecha base hasta el día 1 del mes siguiente. El que arranca
+  // a mitad de mes paga solo los días hábiles (lunes a viernes) que le quedan:
+  // cuota × días hábiles que faltan ÷ días hábiles del mes, redondeado a
+  // REDONDEO_PROPORCIONAL. Después paga el mes completo cuando le toca.
+  // (No tiene en cuenta feriados.)
+  const REDONDEO_PROPORCIONAL = 100;
+  const REDONDEO_SEMANAS = 500; // solo para mostrar bien los pagos viejos por semanas
   const DURACIONES_FIN_DE_MES = [
+    { id: 'fm-prop', label: 'Proporcional hasta fin de mes', corto: 'Proporcional', tipo: 'finmes', proporcional: true },
     { id: 'fm-mes', label: 'Mes en curso (cuota completa)', corto: 'Mes en curso', tipo: 'finmes', semanas: 4, factor: 1 },
-    { id: 'fm-3s',  label: '3 semanas hasta fin de mes',    corto: '3 semanas',    tipo: 'finmes', semanas: 3, factor: 0.75 },
-    { id: 'fm-2s',  label: '2 semanas hasta fin de mes',    corto: '2 semanas',    tipo: 'finmes', semanas: 2, factor: 0.5 },
-    { id: 'fm-1s',  label: '1 semana hasta fin de mes',     corto: '1 semana',     tipo: 'finmes', semanas: 1, factor: 0.25 },
+    // Ya no se ofrecen (los reemplaza el proporcional), pero quedan definidas para
+    // que los pagos viejos de ese tipo se sigan mostrando bien.
+    { id: 'fm-3s',  label: '3 semanas hasta fin de mes',    corto: '3 semanas',    tipo: 'finmes', semanas: 3, factor: 0.75, oculta: true },
+    { id: 'fm-2s',  label: '2 semanas hasta fin de mes',    corto: '2 semanas',    tipo: 'finmes', semanas: 2, factor: 0.5, oculta: true },
+    { id: 'fm-1s',  label: '1 semana hasta fin de mes',     corto: '1 semana',     tipo: 'finmes', semanas: 1, factor: 0.25, oculta: true },
   ];
+  const DURACION_PROPORCIONAL = DURACIONES_FIN_DE_MES[0];
 
   function duracionPorId(id) {
     return DURACIONES.find(d => d.id === id) || DURACIONES_FIN_DE_MES.find(d => d.id === id) || null;
   }
 
-  // Cuánto se cobra por una duración, según la cuota mensual del cliente
-  function montoDe(precio, dur) {
+  // Días de lunes a viernes entre 'desde' (incluido) y 'hasta' (sin incluir)
+  function diasHabiles(desde, hasta) {
+    let n = 0;
+    const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
+    while (d < hasta) {
+      const w = d.getDay();
+      if (w !== 0 && w !== 6) n++;
+      d.setDate(d.getDate() + 1);
+    }
+    return n;
+  }
+  function habilesHastaFinDeMes(base) { return diasHabiles(base, primerDiaMesSiguiente(base)); }
+  function habilesDelMes(base) { return diasHabiles(new Date(base.getFullYear(), base.getMonth(), 1), primerDiaMesSiguiente(base)); }
+
+  // Cuánto se cobra por una duración, según la cuota mensual del cliente.
+  // 'base' (fecha desde la que cuenta el pago) solo hace falta para el proporcional.
+  function montoDe(precio, dur, base) {
+    if (dur.proporcional) {
+      const b = base || todayMidnight();
+      const total = habilesDelMes(b);
+      const bruto = total ? (precio || 0) * habilesHastaFinDeMes(b) / total : 0;
+      return Math.round(bruto / REDONDEO_PROPORCIONAL) * REDONDEO_PROPORCIONAL;
+    }
     const bruto = (precio || 0) * dur.factor;
     if (dur.tipo === 'finmes' && dur.factor < 1) return Math.round(bruto / REDONDEO_SEMANAS) * REDONDEO_SEMANAS;
     return Math.round(bruto);
@@ -1133,15 +1162,17 @@
 
   // Qué pago "hasta fin de mes" corresponde si el período arranca en 'base':
   //  - si arranca un día 1 ya está ordenado: null (va el pago común de 1 mes)
-  //  - dentro del plazo de pago (del 1 al 10): la cuota completa
-  //  - después: 3, 2 o 1 semanas según lo que falte para fin de mes
-  // 'base' es donde termina lo que el cliente ya tiene pago (o hoy si arranca),
-  // así que al que pagó hasta el 18 le tocan 2 semanas para llegar al día 1.
+  //  - si no: el proporcional por los días hábiles que le quedan al mes
+  // 'base' es donde termina lo que el cliente ya tiene pago (o hoy si arranca).
   function sugerenciaFinDeMes(base) {
     if (base.getDate() === 1) return null;
-    if (base.getDate() <= diasParaPagar()) return 'fm-mes';
-    const semanas = Math.min(3, Math.max(1, Math.round(diasHastaFinDeMes(base) / 7)));
-    return 'fm-' + semanas + 's';
+    if (habilesHastaFinDeMes(base) === 0) return null; // no quedan días hábiles en el mes
+    return 'fm-prop';
+  }
+
+  function etiquetaProporcional(base) {
+    const n = habilesHastaFinDeMes(base);
+    return 'Proporcional: ' + n + (n === 1 ? ' día hábil' : ' días hábiles') + ' de ' + habilesDelMes(base);
   }
 
   // Las opciones "desde hoy" llevan este prefijo en el desplegable. Es solo para
@@ -1152,29 +1183,22 @@
   function opcionesDuracionHtml(base, precio) {
     const sugerida = sugerenciaFinDeMes(base);
     const conPrecio = precio !== null && precio !== undefined;
-    const opcion = (d, elegida, extra) =>
-      `<option value="${d.id}" ${elegida ? 'selected' : ''}>${d.label}${conPrecio ? ' — ' + money(montoDe(precio, d)) : ''}${extra || ''}</option>`;
+    const opcion = (d, elegida, extra, label) =>
+      `<option value="${d.id}" ${elegida ? 'selected' : ''}>${label || d.label}${conPrecio ? ' — ' + money(montoDe(precio, d, base)) : ''}${extra || ''}</option>`;
     const comunes = DURACIONES.filter(d => !d.oculta).map(d => opcion(d, !sugerida && d.id === '1m')).join('');
 
     // Cliente que venía pagando y se atrasó: el período sugerido arranca donde
     // terminó su pago anterior (antes de hoy). Pasado el plazo del mes se ofrece
-    // además cobrarle por semanas contando desde hoy, por si estuvo ausente.
+    // además cobrarle el proporcional contando desde hoy, por si estuvo ausente.
     const hoy = todayMidnight();
     let desdeHoy = '';
-    if (base < hoy && hoy.getDate() > diasParaPagar()) {
-      const diasHoy = diasHastaFinDeMes(hoy);
-      const ops = DURACIONES_FIN_DE_MES
-        .filter(d => d.semanas < 4 && (d.semanas - 1) * 7 < diasHoy)
-        .map(d => `<option value="${PREFIJO_DESDE_HOY}${d.id}">${d.corto} desde hoy${conPrecio ? ' — ' + money(montoDe(precio, d)) : ''}</option>`).join('');
-      if (ops) desdeHoy = `<optgroup label="Si estuvo ausente: contar desde hoy">${ops}</optgroup>`;
+    if (base < hoy && hoy.getDate() > diasParaPagar() && habilesHastaFinDeMes(hoy) > 0) {
+      desdeHoy = `<optgroup label="Si estuvo ausente: contar desde hoy"><option value="${PREFIJO_DESDE_HOY}${DURACION_PROPORCIONAL.id}">${etiquetaProporcional(hoy)} desde hoy${conPrecio ? ' — ' + money(montoDe(precio, DURACION_PROPORCIONAL, hoy)) : ''}</option></optgroup>`;
     }
 
     if (!sugerida) return desdeHoy ? `<optgroup label="Períodos completos">${comunes}</optgroup>${desdeHoy}` : comunes;
-    const dias = diasHastaFinDeMes(base);
-    // Solo las semanas que tienen sentido para lo que falta del mes
-    const finDeMes = DURACIONES_FIN_DE_MES
-      .filter(d => d.id === sugerida || (d.id === 'fm-mes' ? dias > 21 : (d.semanas - 1) * 7 < dias))
-      .map(d => opcion(d, d.id === sugerida, d.id === sugerida ? ' · sugerido' : '')).join('');
+    const finDeMes = opcion(DURACION_PROPORCIONAL, true, ' · sugerido', etiquetaProporcional(base))
+      + opcion(duracionPorId('fm-mes'), false);
     return `<optgroup label="Para quedar venciendo el día 1">${finDeMes}</optgroup><optgroup label="Otros períodos">${comunes}</optgroup>${desdeHoy}`;
   }
 
@@ -1182,9 +1206,14 @@
   function textoPeriodoPago(base, venc, dur) {
     const vencIso = isoDate(venc);
     if (dur && dur.tipo === 'finmes') {
+      const siguiente = 'La cuota siguiente vence el ' + formatFechaCorta(vencIso) + ' y se paga hasta el ' + formatFechaCorta(limitePago(vencIso)) + '.';
+      if (dur.proporcional) {
+        const n = habilesHastaFinDeMes(base);
+        return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes: ' + n + (n === 1 ? ' día hábil' : ' días hábiles')
+          + ' de los ' + habilesDelMes(base) + ' del mes. ' + siguiente;
+      }
       const dias = Math.round((venc - base) / 86400000);
-      return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes (' + dias + (dias === 1 ? ' día' : ' días') + '). '
-        + 'La cuota siguiente vence el ' + formatFechaCorta(vencIso) + ' y se paga hasta el ' + formatFechaCorta(limitePago(vencIso)) + '.';
+      return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes (' + dias + (dias === 1 ? ' día' : ' días') + '). ' + siguiente;
     }
     const texto = 'Este pago cubre del ' + formatFechaCorta(isoDate(base)) + ' al ' + formatFechaCorta(vencIso) + '.';
     // Si no termina un día 1, el mes en que termina se le va a reclamar igual
@@ -1447,8 +1476,12 @@
     return d;
   }
 
-  // Días hábiles reservables: de hoy a viernes de esta semana.
-  // Si hoy es sábado o domingo, muestra la semana próxima completa (lunes a viernes).
+  // Cuántas semanas (de lunes a viernes) pueden ver y reservar los clientes:
+  // la actual y la que viene. Sábado y domingo, la "actual" pasa a ser la que
+  // empieza el lunes. Para abrir más o menos semanas alcanza con cambiar este número.
+  const SEMANAS_RESERVABLES = 2;
+
+  // Días hábiles reservables: de hoy en adelante, dentro de las semanas reservables.
   function bookableWeekdays() {
     return fullBookableWeek().filter(d => d >= todayMidnight());
   }
@@ -1459,22 +1492,39 @@
     return t;
   }
 
-  // Los 5 días (lunes a viernes) de la semana reservable, incluyendo los que ya pasaron
-  function fullBookableWeek() {
+  // Lunes de la primera semana reservable
+  function primerLunesReservable() {
     const today = todayMidnight();
     const dow = today.getDay();
-    let monday = new Date(today);
+    const monday = new Date(today);
     if (dow === 0) monday.setDate(today.getDate() + 1);
     else if (dow === 6) monday.setDate(today.getDate() + 2);
     else monday.setDate(today.getDate() - (dow - 1));
+    return monday;
+  }
 
+  // Los días (lunes a viernes) de las semanas reservables, incluyendo los que ya pasaron
+  function fullBookableWeek() {
+    const monday = primerLunesReservable();
     const out = [];
-    for (let i = 0; i < 5; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      out.push(d);
+    for (let s = 0; s < SEMANAS_RESERVABLES; s++) {
+      for (let i = 0; i < 5; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + s * 7 + i);
+        out.push(d);
+      }
     }
     return out;
+  }
+
+  // "esta semana" / "la semana que viene" / "la semana del 2/11", según la fecha
+  function nombreSemana(fechaIso) {
+    const lunes = mondayOf(fechaIso);
+    const lunesHoy = mondayOf(isoDate(ahora()));
+    const dif = Math.round((lunes - lunesHoy) / (7 * 86400000));
+    if (dif === 0) return 'esta semana';
+    if (dif === 1) return 'la semana que viene';
+    return 'la semana del ' + lunes.getDate() + '/' + (lunes.getMonth() + 1);
   }
 
   // Total de reservas activas de un cliente dentro de la semana (lun-vie) de 'fechaIso'
@@ -2658,7 +2708,7 @@
         if (el) el.textContent = textoPeriodoPago(previo.base, previo.venc, previo.dur);
         const cliente = state.data.clientes.find(c => c.dni === dni);
         const montoEl = document.querySelector(`[data-monto-dni="${dni}"]`);
-        if (montoEl && cliente) montoEl.textContent = money(montoDe(cliente.precio, previo.dur));
+        if (montoEl && cliente) montoEl.textContent = money(montoDe(cliente.precio, previo.dur, previo.base));
       };
     });
     // Deshacer un pago borra un registro de plata: pide un segundo toque
@@ -2806,7 +2856,7 @@
     const { dur, base, venc } = periodoNuevoPago(state.data, dni, duracionId);
     if (!dur) return;
     const diasReales = Math.round((venc - base) / 86400000);
-    const monto = montoDe(cliente.precio, dur);
+    const monto = montoDe(cliente.precio, dur, base);
     const nota = String(comprobante || '').trim().slice(0, 80);
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
@@ -2979,7 +3029,7 @@
             </select>
           </div>
           <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
-          <div class="pago-monto"><span>A cobrar</span><b data-monto-dni="${c.dni}">${money(montoDe(c.precio, previo.dur))}</b></div>
+          <div class="pago-monto"><span>A cobrar</span><b data-monto-dni="${c.dni}">${money(montoDe(c.precio, previo.dur, previo.base))}</b></div>
           <div class="pago-preview" data-preview-dni="${c.dni}" style="margin-top:2px;">${textoPeriodoPago(previo.base, previo.venc, previo.dur)}</div>
           <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>`;
   }
@@ -2998,7 +3048,7 @@
       // El próximo pago que le corresponde
       const base = baseProximoPago(data, c.dni);
       const dur = duracionPorId(sugerenciaFinDeMes(base) || '1m');
-      faltan.push({ c, dur, monto: montoDe(c.precio, dur), hasta: ultimo ? ultimo.fechaVencimiento : null });
+      faltan.push({ c, dur, monto: montoDe(c.precio, dur, base), hasta: ultimo ? ultimo.fechaVencimiento : null });
     });
     const limiteIso = limiteDelMes(hoy);
     return {
@@ -3866,7 +3916,7 @@
     const misActivas = data.reservas.filter(r => r.dni === cliente.dni && r.estado !== 'cancelado');
     const misDelDia = misActivas.filter(r => r.fecha === selectedDate);
 
-    const semana = fullBookableWeek().map(d => {
+    const diaHtml = (d) => {
       const iso = isoDate(d);
       const pasado = d < hoy;
       const clases = [iso === selectedDate ? 'active' : '', pasado ? 'past' : '', d.getTime() === hoy.getTime() ? 'hoy' : '',
@@ -3876,7 +3926,15 @@
                 <span class="dnum">${d.getDate()}</span>
                 <span class="marca"></span>
               </button>`;
-    }).join('');
+    };
+    // Una fila por semana, con su nombre arriba
+    const diasReservables = fullBookableWeek();
+    let semana = '';
+    for (let i = 0; i < diasReservables.length; i += 5) {
+      const fila = diasReservables.slice(i, i + 5);
+      const nombre = nombreSemana(isoDate(fila[0]));
+      semana += `<div class="sem-titulo">${nombre.charAt(0).toUpperCase() + nombre.slice(1)}</div><div class="sem">${fila.map(diaHtml).join('')}</div>`;
+    }
 
     // ¿Puede reservar otro turno este día? Si no, por qué.
     const bloqueado = cliente.estado !== 'Activo';
@@ -3893,12 +3951,12 @@
     } else if (cuotaVencida) {
       estadoHtml = `<div class="banner" style="margin-top:10px;"><b>Cuota vencida</b>No podés reservar turnos hasta pagar la cuota. Pasá por recepción para regularizarla.</div>`;
     } else if (limiteSemanalAlcanzado) {
-      estadoHtml = `<p class="turnos-estado aviso">Ya reservaste tus ${limiteSemanal} turnos de esta semana. Si necesitás uno más, hablalo con tu profe.</p>`;
+      estadoHtml = `<p class="turnos-estado aviso">Ya reservaste tus ${limiteSemanal} turnos de ${nombreSemana(selectedDate)}. Si necesitás uno más, hablalo con tu profe.</p>`;
     } else if (limiteDiarioAlcanzado) {
       estadoHtml = `<p class="turnos-estado aviso">Ya tenés ${MAX_TURNOS_POR_DIA} turnos este día. Cancelá uno si querés cambiarlo.</p>`;
     } else if (isFinite(limiteSemanal)) {
       const quedan = limiteSemanal - usadosSemana;
-      estadoHtml = `<p class="turnos-estado">${quedan === 1 ? 'Te queda 1 turno' : 'Te quedan ' + quedan + ' turnos'} para reservar esta semana.</p>`;
+      estadoHtml = `<p class="turnos-estado">${quedan === 1 ? 'Te queda 1 turno' : 'Te quedan ' + quedan + ' turnos'} para reservar ${nombreSemana(selectedDate)}.</p>`;
     } else {
       estadoHtml = `<p class="turnos-estado">Tocá un horario para reservarlo y ver quién va.</p>`;
     }
@@ -3954,7 +4012,7 @@
     return `
       <div class="view">
         ${tituloVista('turnos', 'Turnos', 'Elegí el día y el horario')}
-        <div class="sem">${semana}</div>
+        ${semana}
         <p class="turnos-dia">${fechaCompleta(selectedDate)}</p>
         ${estadoHtml}
         ${visibles.length > 0
@@ -3964,7 +4022,7 @@
                <span><i class="pocos"></i>Últimos lugares</span>
                <span><i class="lleno"></i>Completo</span>
              </div>`
-          : `<div class="empty-state">Ya no quedan turnos para este día.<br>${quedanOtrosDias ? 'Elegí otro día de la semana.' : 'Desde el sábado vas a poder reservar los de la semana que viene.'}</div>`}
+          : `<div class="empty-state">Ya no quedan turnos para este día.<br>${quedanOtrosDias ? 'Elegí otro día.' : 'Desde el sábado se abren los turnos de una semana más.'}</div>`}
       </div>
     `;
   }
@@ -4646,7 +4704,7 @@
           detalleEl.textContent = '';
         } else {
           const hoy = todayMidnight();
-          montoEl.textContent = money(montoDe(precio, dur));
+          montoEl.textContent = money(montoDe(precio, dur, todayMidnight()));
           detalleEl.textContent = textoPeriodoPago(hoy, calcularVencimiento(hoy, dur), dur);
         }
       }
@@ -4974,7 +5032,7 @@
       hoy.setHours(0, 0, 0, 0);
       const venc = calcularVencimiento(hoy, dur);
       const diasReales = Math.round((venc - hoy) / 86400000);
-      const monto = montoDe(precio, dur);
+      const monto = montoDe(precio, dur, hoy);
       const nuevoPago = {
         id: 'pago-' + dni + '-' + Date.now(),
         dni, fechaPago: isoDate(hoy), duracionId: dur.id, dias: diasReales, monto, metodoPago,
