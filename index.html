@@ -1026,7 +1026,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '18/11/2026 · 35';
+  const VERSION_APP = '18/11/2026 · 36';
 
   const CUPO = 4; // personas por turno
   // Control diario de los clientes PRO (wellness, TQR y RPE): apagado por ahora.
@@ -2412,7 +2412,7 @@
       const filas = grupos[plan].map(p => `
         <div class="plan-row">
           <span class="plan-row-dias">${p.dias ? p.dias + (p.dias === 1 ? ' día/sem' : ' días/sem') : 'Integral'}${(() => {
-            const cuantos = data.clientes.filter(c => c.estado !== 'Baja' && c.plan === p.plan && (c.dias == null ? null : c.dias) === (p.dias == null ? null : p.dias)).length;
+            const cuantos = clientesReales(data).filter(c => c.estado !== 'Baja' && c.plan === p.plan && (c.dias == null ? null : c.dias) === (p.dias == null ? null : p.dias)).length;
             return cuantos ? ` · ${cuantos} ${cuantos === 1 ? 'cliente' : 'clientes'}` : '';
           })()}</span>
           <input type="text" inputmode="numeric" class="plan-precio-input" data-plan-id="${p.id}" value="${p.precio}">
