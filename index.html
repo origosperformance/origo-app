@@ -173,6 +173,41 @@
   .cobro-rapido .pago-registrar { margin-top: 0; }
   .cobro-rapido select, .cobro-rapido input { width: 100%; max-width: 100%; }
 
+  /* Inicio: clientes que no vienen */
+  .novienen-card { margin: 10px 0 4px; border-left: 4px solid var(--violeta); background: linear-gradient(90deg, rgba(167, 139, 250, 0.12), var(--surface) 70%); }
+  .novienen-card summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; font-size: 14px; }
+  .novienen-card summary::-webkit-details-marker { display: none; }
+  .novienen-card summary span:nth-child(2) { flex: 1; }
+  .novienen-card[open] summary { margin-bottom: 8px; }
+  .novienen-card .pago-fila { align-items: center; }
+
+  /* Turnos: horario del día y horarios libres */
+  .dia-horario {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: var(--text-muted);
+    padding: 10px 12px; border: 1px dashed var(--line); border-radius: 12px; margin-bottom: 12px;
+  }
+  .dia-horario.especial { border-style: solid; border-color: rgba(255, 181, 71, 0.5); color: #FFC86E; background: rgba(255, 181, 71, 0.08); }
+  .dia-horario.cerrado { border-style: solid; border-color: rgba(255, 107, 97, 0.5); color: #FF8C84; background: rgba(255, 107, 97, 0.08); }
+  .dia-editor { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .dia-franja { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+  .dia-franja label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+  .dia-franja select { background: var(--surface-2); border: 1px solid var(--line); color: var(--text); padding: 9px 8px; border-radius: 10px; font-size: 14px; }
+  .dia-aviso { border-radius: 14px; padding: 12px 14px; margin: 6px 0 14px; font-size: 13px; line-height: 1.5;
+    background: rgba(255, 181, 71, 0.10); border: 1px solid rgba(255, 181, 71, 0.45); color: #FFD08A; }
+  .dia-aviso b { display: block; font-size: 14px; color: #FFC86E; }
+  .dia-aviso.cerrado { background: rgba(255, 107, 97, 0.10); border-color: rgba(255, 107, 97, 0.45); color: #FFA39C; }
+  .dia-aviso.cerrado b { color: #FF8C84; }
+  .sem-dia.cerrado { opacity: 0.45; }
+  .sem-dia.cerrado .dnum { text-decoration: line-through; }
+  .sem-dia.especial:not(.active) { border-color: rgba(255, 181, 71, 0.55); }
+  .th-libres { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 14px; }
+  .th-libres .lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); margin-right: 4px; }
+  .libre-chip {
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; padding: 6px 9px; border-radius: 9px; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line); color: var(--text);
+  }
+  .libre-chip.pasado { opacity: 0.45; }
+
   /* Inicio: agenda del día */
   .agenda { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
   .agenda-fila {
@@ -1026,7 +1061,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '18/11/2026 · 36';
+  const VERSION_APP = '18/11/2026 · 37';
 
   const CUPO = 4; // personas por turno
   // Control diario de los clientes PRO (wellness, TQR y RPE): apagado por ahora.
@@ -1353,7 +1388,8 @@
     const d = new Date(desde.getFullYear(), desde.getMonth(), desde.getDate());
     while (d < hasta) {
       const w = d.getDay();
-      if (w !== 0 && w !== 6) n++;
+      const e = (w !== 0 && w !== 6) ? horarioEspecial(isoDate(d)) : null;
+      if (w !== 0 && w !== 6 && !(e && e.cerrado)) n++; // los días cerrados no cuentan
       d.setDate(d.getDate() + 1);
     }
     return n;
@@ -1613,6 +1649,56 @@
       && (x.fecha + ' ' + String(x.hora).slice(0, 5)) < clave);
   }
 
+  // ---------------- Días cerrados y horarios especiales ----------------
+  // Administración puede cerrar un día entero o abrirlo solo en una franja
+  // (por ejemplo, feriados a medio día). Se guarda en la tabla "config" como
+  // una fila 'dia_<AAAA-MM-DD>' con valor 1 = cerrado todo el día, o con
+  // valor HHMMHHMM = primer y último turno del día (8001200 = de 08:00 a 12:00).
+  // Valor 0 o sin fila = horario normal.
+  const CLAVE_DIA = 'dia_';
+  function horarioEspecial(fechaIso) {
+    const cfg = state.data && state.data.config;
+    if (!cfg) return null;
+    const fila = cfg.find(c => c.clave === CLAVE_DIA + fechaIso);
+    const v = fila ? Number(fila.valor) : 0;
+    if (!v) return null;
+    if (v === 1) return { cerrado: true };
+    const hhmm = (n) => { const t = String(n).padStart(4, '0'); return t.slice(0, 2) + ':' + t.slice(2); };
+    return { desde: hhmm(Math.floor(v / 10000)), hasta: hhmm(v % 10000) };
+  }
+  function horarioAbierto(fechaIso, hora) {
+    const e = horarioEspecial(fechaIso);
+    if (!e) return true;
+    if (e.cerrado) return false;
+    const h = String(hora).slice(0, 5);
+    return h >= e.desde && h <= e.hasta;
+  }
+  function textoHorarioEspecial(e) {
+    if (!e) return 'Horario normal';
+    return e.cerrado ? 'Cerrado todo el día' : 'Abierto de ' + e.desde + ' a ' + e.hasta + ' (último turno)';
+  }
+  // Guarda el horario de un día: null = normal, { cerrado: true } o { desde, hasta }
+  async function guardarHorarioDia(fechaIso, e) {
+    const clave = CLAVE_DIA + fechaIso;
+    const existe = state.data.config.some(c => c.clave === clave);
+    if (!e) {
+      const res = await sb.from('config').update({ valor: 0 }).eq('clave', clave);
+      if (!res.error) await sb.from('config').delete().eq('clave', clave);
+      return !res.error;
+    }
+    const valor = e.cerrado ? 1 : parseInt(e.desde.replace(':', ''), 10) * 10000 + parseInt(e.hasta.replace(':', ''), 10);
+    const res = existe
+      ? await sb.from('config').update({ valor }).eq('clave', clave)
+      : await sb.from('config').insert({ clave, valor });
+    if (res.error) console.error('No se pudo guardar el horario del día:', res.error);
+    return !res.error;
+  }
+  // Turnos activos de un día que quedaron fuera del horario (para avisarles)
+  function turnosFueraDeHorario(data, fechaIso) {
+    return data.reservas.filter(r => r.fecha === fechaIso && r.estado === 'reservado'
+      && !horarioAbierto(fechaIso, r.hora) && !turnoYaEmpezo(r.fecha, r.hora));
+  }
+
   // ---------------- Turnos fijos ----------------
   // Administración le marca a un cliente los días y horarios que viene fijo.
   // La app le reserva sola esos turnos en las semanas que se pueden reservar
@@ -1685,7 +1771,7 @@
         dias.forEach(d => {
           const fecha = isoDate(d);
           fijos.filter(f => f.dia === d.getDay()).forEach(f => {
-            if (turnoYaEmpezo(fecha, f.hora)) return;
+            if (turnoYaEmpezo(fecha, f.hora) || !horarioAbierto(fecha, f.hora)) return;
             const id = idFijo(c.dni, fecha, f.hora);
             if (data.reservas.some(r => r.id === id)) return; // ya se reservó (o lo canceló)
             const delDia = data.reservas.filter(r => r.dni === c.dni && r.fecha === fecha);
@@ -1764,7 +1850,8 @@
     listaScrollY: 0,       // dónde estaba la lista al abrir la ficha
     nuevoClienteAbierto: false,
     verMontos: false,
-    cobroAbierto: null,      // Turnos: reserva cuyo cliente se está cobrando ahí mismo        // Cuotas: los montos cobrados se ven recién al tocar "Mostrar montos"
+    cobroAbierto: null,
+    diaEditando: null,       // Turnos: horario del día que se está cambiando ({ fecha, tipo, desde, hasta })      // Turnos: reserva cuyo cliente se está cobrando ahí mismo        // Cuotas: los montos cobrados se ven recién al tocar "Mostrar montos"
     altaProspecto: null,     // código del cliente nuevo (sin cuenta) que se está dando de alta
     fijosEditando: null,     // administración: días fijos que se están eligiendo en la ficha ({ 'w|hora': true })
     confirmarRutinaId: null,
@@ -1840,7 +1927,7 @@
   // Primer día de la semana reservable que todavía tiene algún horario por delante
   function primerDiaConTurnos() {
     const dias = bookableWeekdays();
-    const conTurnos = dias.find(d => HORARIOS.some(h => !turnoYaEmpezo(isoDate(d), h)));
+    const conTurnos = dias.find(d => HORARIOS.some(h => !turnoYaEmpezo(isoDate(d), h) && horarioAbierto(isoDate(d), h)));
     return isoDate(conTurnos || dias[0]);
   }
 
@@ -2519,6 +2606,32 @@
           <button class="cancel-link" data-jump-tab="asistencias">Ver todo →</button>
         </div>`;
 
+    // ---- Clientes activos que dejaron de venir ----
+    // Última clase hace más de DIAS_SIN_VENIR días y sin turnos reservados por delante.
+    // (El que nunca vino no entra: no hay forma de saber desde cuándo es cliente.)
+    const DIAS_SIN_VENIR = 14;
+    const noVienen = activos.map(c => {
+      const mias = reservas.filter(r => r.dni === c.dni && r.estado !== 'cancelado');
+      if (mias.some(r => estadoEfectivo(r) === 'reservado')) return null;
+      const ultima = mias.filter(r => estadoEfectivo(r) === 'asistio').map(r => r.fecha).sort().pop();
+      if (!ultima) return null;
+      const dias = diasEntre(ultima, hoy);
+      return dias > DIAS_SIN_VENIR ? { c, ultima, dias } : null;
+    }).filter(Boolean).sort((a, b) => b.dias - a.dias);
+    const noVienenHtml = !noVienen.length ? '' : `
+        <details class="cuota-card novienen-card">
+          <summary><span class="resumen-atencion-num" style="color:var(--violeta);">${noVienen.length}</span>
+            <span>${noVienen.length === 1 ? 'cliente no viene' : 'clientes no vienen'} hace más de 2 semanas</span><span class="resumen-atencion-arrow">Ver</span></summary>
+          ${noVienen.map(x => `
+          <div class="pago-fila">
+            <div>
+              <button class="nombre-link p1" data-ficha-dni="${x.c.dni}">${esc(x.c.nombre)}</button>
+              <div class="p2">Última clase: ${formatFechaCorta(x.ultima)} · hace ${x.dias} días</div>
+            </div>
+            ${botonWhatsapp(x.c.telefono, 'Hola ' + primerNombre(x.c.nombre) + '! Te extrañamos en ORIGO. ¿Querés que te reservemos un turno esta semana? Avisanos qué día y horario te queda bien.', 'Escribirle')}
+          </div>`).join('')}
+        </details>`;
+
     const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
     const sinMatricula = matriculaActiva() ? activos.filter(c => !(c.matricula && c.matricula.pagada)).length : 0;
 
@@ -2543,6 +2656,7 @@
         <p class="sub">${fechaCompleta(hoy)}</p>
 
         <div class="resumen-atencion-list">${atencionHtml}</div>
+        ${noVienenHtml}
 
         <h2 style="font-size:16px; margin-top:4px;">${agendaTitulo}</h2>
         ${agendaHtml}
@@ -3811,7 +3925,7 @@
         const iso = isoDate(d);
         const nn = cuantos(iso, hora);
         const alfa = nn === 0 ? 0 : Math.min(1, 0.14 + 0.86 * nn / CUPO);
-        return `<button class="sg-celda ${nn >= CUPO ? 'lleno' : ''} ${turnoYaEmpezo(iso, hora) ? 'pasado' : ''}" data-ir-dia="${iso}" data-ir-hora="${hora}"
+        return `<button class="sg-celda ${nn >= CUPO ? 'lleno' : ''} ${turnoYaEmpezo(iso, hora) || !horarioAbierto(iso, hora) ? 'pasado' : ''}" data-ir-dia="${iso}" data-ir-hora="${hora}"
                   style="${nn ? `background:rgba(47,111,237,${alfa.toFixed(2)});` : ''}" aria-label="${fechaLarga(iso)} ${hora}: ${nn} de ${CUPO}">${nn || ''}</button>`;
       }).join('')).join('');
       const totalSemana = dias.reduce((sum, d) => sum + cuantos(isoDate(d)), 0);
@@ -3930,7 +4044,9 @@
           </div>`;
       }
 
-      const botonAnotar = lleno ? '' : `<button class="cancel-link" data-anotar-hora="${hora}">${anotando ? 'Cerrar' : '+ Anotar'}</button>`;
+      const cerradoH = !horarioAbierto(fecha, hora);
+      const botonAnotar = (lleno || cerradoH) ? (cerradoH ? '<span class="pill pill-red">Cerrado</span>' : '')
+        : `<button class="cancel-link" data-anotar-hora="${hora}">${anotando ? 'Cerrar' : '+ Anotar'}</button>`;
       if (items.length === 0) {
         return `
         <div class="th vacio" data-th="${hora}">
@@ -3952,20 +4068,133 @@
         </div>`;
     };
 
+    // Los horarios con gente (o en los que se está anotando) van completos; los
+    // vacíos se juntan en una tira de botones chicos, para no ocupar la pantalla.
+    // Los horarios cerrados y vacíos no se muestran.
+    function filasCompactas() {
+      let html = '', libres = [];
+      const volcar = () => {
+        if (libres.length) html += `<div class="th-libres"><span class="lbl">Libres</span>${libres.map(h =>
+          `<button class="libre-chip ${turnoYaEmpezo(fecha, h) ? 'pasado' : ''}" data-anotar-hora="${h}" aria-label="Anotar a las ${h}">${h}</button>`).join('')}</div>`;
+        libres = [];
+      };
+      HORARIOS.forEach(h => {
+        const conGente = delDia.some(r => r.hora === h);
+        if (!conGente && state.anotarEn !== h) {
+          if (horarioAbierto(fecha, h)) libres.push(h);
+          return;
+        }
+        volcar();
+        html += fila(h);
+      });
+      volcar();
+      return html || '<div class="empty-state">Este día está cerrado.</div>';
+    }
+
     return `
-        <p class="sub">Cada turno cuenta como asistencia cuando empieza. Tocá un nombre para marcar una falta o cancelarle el turno.</p>
+        <p class="sub">Tocá un horario libre para anotar a alguien, o un nombre para marcar una falta o cancelarle el turno.</p>
         ${novedadesHtml}${faltaSqlHtml}
         ${segHtml}
         ${navHtml}
         <div class="sem">${tira}</div>
         <p class="turnos-dia" style="margin-bottom:10px;">${fechaCompleta(fecha)}${fecha === hoyIso ? ' (hoy)' : ''}</p>
         ${resumenHtml}
+        ${horarioDiaAdminHtml(data, fecha)}
         ${delDia.some(r => esPrimeraClase(data, r)) ? `<div class="leyenda"><span><i style="background:var(--nuevo)"></i>Cliente nuevo: todavía no vino a ninguna clase</span></div>` : ''}
-        ${HORARIOS.map(fila).join('')}
+        ${filasCompactas()}
         <label class="pago-detalle" style="display:block; margin-top:16px;">Ir a otra fecha
           <input type="date" id="asistFechaInput" value="${fecha}" class="date-input" style="margin:6px 0 0;" />
         </label>
     `;
+  }
+
+  // Bloque "horario de este día" en Turnos: ver, cambiar y avisar a los afectados
+  function horarioDiaAdminHtml(data, fecha) {
+    const esp = horarioEspecial(fecha);
+    const ed = state.diaEditando && state.diaEditando.fecha === fecha ? state.diaEditando : null;
+    let html;
+    if (ed) {
+      const opcionesHora = (sel) => HORARIOS.map(h => `<option value="${h}" ${h === sel ? 'selected' : ''}>${h}</option>`).join('');
+      html = `
+        <div class="dia-editor">
+          <div class="cuota-nombre" style="margin-bottom:10px;">Horario del ${fechaLarga(fecha).toLowerCase()}</div>
+          <div class="seg" style="margin-bottom:10px;">
+            <button class="seg-btn ${ed.tipo === 'normal' ? 'active' : ''}" data-dia-tipo="normal">Normal</button>
+            <button class="seg-btn ${ed.tipo === 'especial' ? 'active' : ''}" data-dia-tipo="especial">Medio día</button>
+            <button class="seg-btn ${ed.tipo === 'cerrado' ? 'active' : ''}" data-dia-tipo="cerrado">Cerrado</button>
+          </div>
+          ${ed.tipo === 'especial' ? `
+          <div class="dia-franja">
+            <label>Primer turno<select id="diaDesde">${opcionesHora(ed.desde)}</select></label>
+            <label>Último turno<select id="diaHasta">${opcionesHora(ed.hasta)}</select></label>
+          </div>` : ''}
+          <div class="pago-detalle" style="margin:4px 0 10px; line-height:1.5;">${
+            ed.tipo === 'cerrado' ? 'Nadie va a poder reservar ese día.'
+            : ed.tipo === 'especial' ? 'Los clientes solo ven y reservan los horarios de esa franja.'
+            : 'Se puede reservar en todos los horarios, como siempre.'}</div>
+          <div class="error-text" id="diaError"></div>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" data-dia-guardar="${fecha}" style="flex:1;">Guardar</button>
+            <button class="btn btn-ghost" data-dia-cancelar="1">Cancelar</button>
+          </div>
+        </div>`;
+    } else {
+      html = `
+        <div class="dia-horario ${esp ? (esp.cerrado ? 'cerrado' : 'especial') : ''}">
+          <span>${esc(textoHorarioEspecial(esp))}</span>
+          <button class="cancel-link" data-dia-editar="${fecha}">${esp ? 'Cambiar' : 'Cerrar o medio día'}</button>
+        </div>`;
+    }
+    // Turnos que quedaron fuera del horario: avisar y cancelar
+    const fuera = turnosFueraDeHorario(data, fecha);
+    if (fuera.length && !ed) {
+      const que = esp && esp.cerrado ? 'ORIGO va a estar cerrado' : esp ? 'abrimos solo de ' + esp.desde + ' a ' + esp.hasta : '';
+      html += `
+        <div class="cuota-card pendiente-card" style="margin-top:8px;">
+          <div class="cuota-nombre" style="margin-bottom:6px;">${fuera.length === 1 ? '1 turno quedó' : fuera.length + ' turnos quedaron'} fuera de horario</div>
+          <div class="pago-detalle" style="margin-bottom:8px;">Avisales por WhatsApp y después cancelá sus turnos.</div>
+          ${fuera.sort((a, b) => a.hora.localeCompare(b.hora)).map(r => {
+            const c = data.clientes.find(x => x.dni === r.dni);
+            const tel = c ? c.telefono : esProspecto(r.dni) ? datosProspecto(r.dni).telefono : '';
+            const nombre = nombreDeDni(data, r.dni);
+            const msg = 'Hola ' + primerNombre(nombre) + '! Te avisamos que el ' + fechaLarga(fecha).toLowerCase() + ' ' + que
+              + ', así que tu turno de las ' + String(r.hora).slice(0, 5) + ' se cancela. Podés reservar otro horario desde la app. ¡Gracias!';
+            return `<div class="pago-fila"><div><div class="p1">${esc(nombre)}</div><div class="p2">${String(r.hora).slice(0, 5)} hs</div></div>
+              ${botonWhatsapp(tel, msg, 'Avisar') || '<span class="p2">sin teléfono</span>'}</div>`;
+          }).join('')}
+          <button class="slot-btn" data-cancelar-fuera="${fecha}" style="width:100%; margin-top:10px;">Cancelar ${fuera.length === 1 ? 'ese turno' : 'esos ' + fuera.length + ' turnos'}</button>
+        </div>`;
+    }
+    return html;
+  }
+
+  async function guardarHorarioDesdeTurnos(fecha) {
+    const ed = state.diaEditando;
+    if (!ed || ed.fecha !== fecha) return;
+    let e = null;
+    if (ed.tipo === 'cerrado') e = { cerrado: true };
+    else if (ed.tipo === 'especial') {
+      if (ed.hasta < ed.desde) { document.getElementById('diaError').textContent = 'El último turno tiene que ser después del primero.'; return; }
+      e = { desde: ed.desde, hasta: ed.hasta };
+    }
+    const ok = await guardarHorarioDia(fecha, e);
+    await refreshData();
+    state.diaEditando = null;
+    showToast(!ok ? 'No se pudo guardar el horario. Probá de nuevo.' : (e ? textoHorarioEspecial(e) : 'Horario normal') + ' el ' + fechaLarga(fecha).toLowerCase());
+    renderApp();
+  }
+
+  async function cancelarTurnosFuera(fecha) {
+    const fuera = turnosFueraDeHorario(state.data, fecha);
+    let fallaron = 0;
+    for (const r of fuera) {
+      state.misAcciones['c-' + r.id] = true;
+      const { error } = await marcarCancelada(r.id);
+      if (error) fallaron++;
+    }
+    await refreshData();
+    showToast(fallaron ? 'No se pudieron cancelar ' + fallaron + ' turnos. Probá de nuevo.' : (fuera.length === 1 ? 'Turno cancelado.' : fuera.length + ' turnos cancelados.'));
+    renderApp();
   }
 
   // Anota a un cliente en un turno desde administración. Respeta el cupo del
@@ -4017,7 +4246,7 @@
   // Botones de la pestaña Turnos de administración
   function wireTurnosAdmin(root) {
     const on = (sel, fn) => root.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
-    const cerrar = () => { state.anotarEn = null; state.reservaAbierta = null; state.cobroAbierto = null; };
+    const cerrar = () => { state.anotarEn = null; state.reservaAbierta = null; state.cobroAbierto = null; state.diaEditando = null; };
     on('[data-turnos-vista]', el => { state.turnosVista = el.dataset.turnosVista; cerrar(); renderApp(); });
     on('[data-turnos-semana]', el => {
       const d = new Date(fechaAdminTurnos() + 'T00:00:00');
@@ -4045,6 +4274,20 @@
       renderApp();
     });
     on('.asist-btn[data-asist-id]', el => marcarAsistencia(el.dataset.asistId, el.dataset.asistVal));
+    on('[data-dia-editar]', el => {
+      const esp = horarioEspecial(el.dataset.diaEditar);
+      state.diaEditando = { fecha: el.dataset.diaEditar,
+        tipo: !esp ? 'especial' : esp.cerrado ? 'cerrado' : 'especial',
+        desde: esp && esp.desde ? esp.desde : HORARIOS[0], hasta: esp && esp.hasta ? esp.hasta : '12:00' };
+      renderApp();
+    });
+    on('[data-dia-tipo]', el => { state.diaEditando.tipo = el.dataset.diaTipo; renderApp(); });
+    on('[data-dia-cancelar]', () => { state.diaEditando = null; renderApp(); });
+    const diaDesde = document.getElementById('diaDesde'), diaHasta = document.getElementById('diaHasta');
+    if (diaDesde) diaDesde.onchange = () => { state.diaEditando.desde = diaDesde.value; };
+    if (diaHasta) diaHasta.onchange = () => { state.diaEditando.hasta = diaHasta.value; };
+    on('[data-dia-guardar]', el => { el.disabled = true; guardarHorarioDesdeTurnos(el.dataset.diaGuardar); });
+    on('[data-cancelar-fuera]', el => confirmarEnDosToques(el, 'Tocá de nuevo para cancelarlos', () => { el.disabled = true; cancelarTurnosFuera(el.dataset.cancelarFuera); }));
     on('[data-cobro-toggle]', el => { state.cobroAbierto = state.cobroAbierto === el.dataset.cobroToggle ? null : el.dataset.cobroToggle; renderApp(); });
     wirePagos(root);
     on('[data-cancelar-admin]', el => { el.disabled = true; cancelarDesdeAdmin(el.dataset.cancelarAdmin); });
@@ -4464,6 +4707,7 @@
 
   // Por qué el cliente no puede reservar ese horario (null = puede)
   function motivoNoReservar(cliente, data, fecha, hora) {
+    if (!horarioAbierto(fecha, hora)) return 'Ese horario está cerrado';
     if (cliente.estado !== 'Activo') return 'Tu membresía no está activa';
     if (cuotaImpideReservar(data, cliente.dni)) return 'Tenés la cuota vencida';
     const mias = data.reservas.filter(r => r.dni === cliente.dni && r.fecha === fecha && r.estado !== 'cancelado');
@@ -4501,8 +4745,9 @@
     const diaHtml = (d) => {
       const iso = isoDate(d);
       const pasado = d < hoy;
+      const esp = horarioEspecial(iso);
       const clases = [iso === selectedDate ? 'active' : '', pasado ? 'past' : '', d.getTime() === hoy.getTime() ? 'hoy' : '',
-        misActivas.some(r => r.fecha === iso) ? 'conturno' : ''].filter(Boolean).join(' ');
+        misActivas.some(r => r.fecha === iso) ? 'conturno' : '', esp && esp.cerrado ? 'cerrado' : esp ? 'especial' : ''].filter(Boolean).join(' ');
       return `<button class="sem-dia ${clases}" ${pasado ? 'disabled' : `data-date="${iso}"`}>
                 <span class="dow">${DIAS_CORTO[d.getDay()]}</span>
                 <span class="dnum">${d.getDate()}</span>
@@ -4544,7 +4789,8 @@
     }
 
     // Los horarios que ya empezaron no se muestran (solo afecta al día de hoy)
-    const visibles = HORARIOS.filter(h => !turnoYaEmpezo(selectedDate, h));
+    const especial = horarioEspecial(selectedDate);
+    const visibles = HORARIOS.filter(h => !turnoYaEmpezo(selectedDate, h) && horarioAbierto(selectedDate, h));
     // Todos los horarios se pueden tocar, aunque estén completos: así se ve quién va
     const infoSlot = (hora) => {
       const ocupados = ocupadosEnTurno(data, selectedDate, hora, cliente.dni);
@@ -4596,8 +4842,10 @@
         ${tituloVista('turnos', 'Turnos', 'Elegí el día y el horario')}
         ${semana}
         <p class="turnos-dia">${fechaCompleta(selectedDate)}</p>
-        ${estadoHtml}
-        ${visibles.length > 0
+        ${especial && especial.cerrado ? `<div class="dia-aviso cerrado"><b>Ese día ORIGO está cerrado</b>Elegí otro día para entrenar.</div>`
+          : especial ? `<div class="dia-aviso"><b>Horario especial</b>Ese día abrimos de ${especial.desde} a ${especial.hasta} (último turno).</div>` : ''}
+        ${especial && especial.cerrado ? '' : estadoHtml}
+        ${especial && especial.cerrado ? '' : visibles.length > 0
           ? `${grupos}
              <div class="slots-leyenda">
                <span><i class="mio"></i>Tu turno</span>
@@ -5829,6 +6077,12 @@
   }
 
   async function reservarTurnoInterno(hora) {
+    if (!horarioAbierto(state.selectedDate, hora)) {
+      showToast('Ese horario está cerrado. Elegí otro.');
+      state.slotElegido = null;
+      renderApp();
+      return;
+    }
     if (state.cliente.estado !== 'Activo') {
       showToast('Tu membresía no está activa: no podés reservar.');
       renderApp();
