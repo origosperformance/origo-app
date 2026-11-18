@@ -144,6 +144,15 @@
     background: rgba(47,111,237,0.08); border: 1px solid var(--line); border-left: 3px solid var(--green);
     border-radius: var(--radius); padding: 14px; font-size: 13px; color: var(--text-muted); margin-bottom: 20px;
   }
+  /* Recaudación (Cuotas): montos ocultos hasta tocar "Mostrar" */
+  .recaudado-card { margin-bottom: 12px; }
+  .recaudado-total { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 4px; margin-top: 6px; border-top: 1px solid var(--line); }
+  .recaudado-total .k { font-size: 13px; font-weight: 600; }
+  .recaudado-total .v { font-family: 'Oswald', sans-serif; font-size: 28px; font-weight: 700; }
+  .monto-oculto { letter-spacing: 2px; color: var(--text-muted); }
+  .ojo-btn { background: none; border: 1px solid var(--line); color: var(--text-muted); border-radius: 14px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+  .ojo-btn.on { color: var(--text); border-color: var(--text-muted); }
+  .pendiente-card { margin-bottom: 12px; border-left: 3px solid var(--amber); }
   .resumen-hero {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 20px; text-align: center; margin-bottom: 14px;
@@ -151,6 +160,32 @@
   .resumen-hero-label { font-size: 12px; color: var(--text-muted); }
   .resumen-hero-num { font-family: 'Oswald', sans-serif; font-size: 38px; font-weight: 700; margin: 6px 0; }
   .resumen-hero-sub { font-size: 12px; color: var(--text-muted); }
+  /* WhatsApp desde administración */
+  .wa-btn {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 7px 10px;
+    border-radius: var(--radius); border: 1px solid #25D366; color: #25D366; background: rgba(37,211,102,0.08);
+    text-decoration: none; font-family: 'Inter', sans-serif; cursor: pointer;
+  }
+  .wa-btn svg { width: 13px; height: 13px; fill: currentColor; }
+  .cuota-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+  .cobro-rapido { flex: 1 1 100%; min-width: 0; max-width: 100%; margin-top: 6px; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+  .cobro-rapido .pago-registrar { margin-top: 0; }
+  .cobro-rapido select, .cobro-rapido input { width: 100%; max-width: 100%; }
+
+  /* Inicio: agenda del día */
+  .agenda { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .agenda-fila {
+    display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; color: var(--text); font-family: 'Inter', sans-serif;
+  }
+  .agenda-fila.ahora { border-color: var(--green); }
+  .agenda-hora { font-family: 'Oswald', sans-serif; font-size: 22px; font-weight: 600; min-width: 58px; line-height: 1.2; }
+  .agenda-hora small { display: block; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--green); text-transform: uppercase; }
+  .agenda-nombres { display: flex; flex-wrap: wrap; gap: 5px; padding-top: 3px; }
+  .agenda-nombres span { font-size: 13px; padding: 4px 10px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--line); }
+  .agenda-nombres span.nuevo { border-color: var(--nuevo); color: var(--nuevo); }
+  .agenda-pie { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); margin: -4px 0 18px; }
   .resumen-hoy-card {
     display: block; width: 100%; text-align: left; cursor: pointer;
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -588,6 +623,12 @@
     -webkit-tap-highlight-color: transparent;
   }
   .nav-btn svg { width: 23px; height: 23px; }
+  .nav-badge {
+    position: absolute; top: 6px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 5px;
+    border-radius: 9px; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
+  }
+  .admin-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+  .admin-head h2 { margin: 0; }
   .nav-btn.active { color: var(--text); }
   .nav-btn.active svg { color: var(--green); }
   .nav-btn.active::before {
@@ -883,9 +924,13 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '18/11/2026 · 31';
+  const VERSION_APP = '18/11/2026 · 33';
 
   const CUPO = 4; // personas por turno
+  // Control diario de los clientes PRO (wellness, TQR y RPE): apagado por ahora.
+  // El plan PRO sigue igual; solo se ocultan "Mi día", la pestaña Pro y la
+  // tarjeta de la ficha. Para volver a usarlo alcanza con poner true.
+  const CONTROL_PRO_ACTIVO = false;
   const MAX_TURNOS_POR_DIA = 2;
   // Minutos de tolerancia después de la hora de inicio durante los que un turno
   // todavía se puede reservar/cancelar. 0 = se cierra en punto.
@@ -898,6 +943,10 @@
     turnos:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.8" y="5.3" width="16.4" height="15" rx="1.2"/><path d="M3.8 9.8h16.4M8.3 3.5v3.4M15.7 3.5v3.4"/><path d="M8 13.6h2.2M12.9 13.6h3.1M8 16.9h2.2"/></svg>',
     reservas: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.3l2.6 2.6 4.9-5.4"/></svg>',
     midia:    '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12.6h3.7l2.3-6.3 3.7 11.4 2.5-7.5 1.5 2.4h4.7"/></svg>',
+    inicio:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19.5a.5.5 0 0 1-.5.5H14.5v-5.5h-5V20H4.5a.5.5 0 0 1-.5-.5z"/></svg>',
+    cuotas:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="1.2"/><circle cx="12" cy="12.25" r="2.6"/><path d="M6.5 9.3v.01M17.5 15.2v.01"/></svg>',
+    clientes: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.6" r="3.2"/><path d="M3.2 19.5c.6-3.3 2.9-5.2 5.8-5.2s5.2 1.9 5.8 5.2"/><path d="M15.6 5.7a3 3 0 0 1 0 5.8M17.4 14.6c1.8.6 3 2.2 3.4 4.9"/></svg>',
+    planes:   '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.8 12.6V4.3a.5.5 0 0 1 .5-.5h8.3l7.6 7.6a.8.8 0 0 1 0 1.1l-7.2 7.2a.8.8 0 0 1-1.1 0z"/><circle cx="8.3" cy="8.3" r="1.4"/></svg>',
     izq:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>',
     der:      '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6l6 6-6 6"/></svg>',
   };
@@ -988,6 +1037,53 @@
   // Texto escrito por un cliente que se muestra en pantalla: siempre pasa por acá
   function esc(t) {
     return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // ---------------- WhatsApp ----------------
+  // Pasa un teléfono cargado como venga ("341-1234567", "0341 15 1234567",
+  // "+54 9 341…") al formato de WhatsApp (549 + característica + número).
+  // Si no tiene característica se asume Rosario (341). null = no se entiende.
+  const CARACTERISTICA_LOCAL = '341';
+  function numeroWhatsapp(tel) {
+    let d = String(tel || '').replace(/\D/g, '');
+    if (!d) return null;
+    if (d.startsWith('00')) d = d.slice(2);
+    if (d.startsWith('54')) { d = d.slice(2); if (d.startsWith('9')) d = d.slice(1); }
+    if (d.startsWith('0')) d = d.slice(1);
+    if (d.length === 12) { // característica + "15" + número
+      for (const n of [2, 3, 4]) if (d.slice(n, n + 2) === '15') { d = d.slice(0, n) + d.slice(n + 2); break; }
+    }
+    if (d.length === 9 && d.startsWith('15')) d = CARACTERISTICA_LOCAL + d.slice(2);
+    if (d.length === 7) d = CARACTERISTICA_LOCAL + d;
+    return d.length === 10 ? '549' + d : null;
+  }
+  const ICONO_WA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2A9.7 9.7 0 0 0 3.7 16.9L2.3 21.8l5-1.3A9.7 9.7 0 1 0 12 2.2zm0 17.7a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 19.9zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.5.1l-.8.9c-.1.2-.3.2-.5.1a6.5 6.5 0 0 1-3.2-2.8c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.3c.1.2 1.6 2.5 4 3.5 1.5.6 2.1.7 2.8.6.5-.1 1.4-.6 1.6-1.1.2-.5.2-1 .1-1.1l-.4-.2z"/></svg>';
+  // Botón que abre WhatsApp con el mensaje ya escrito ('' si el teléfono no sirve)
+  function botonWhatsapp(tel, texto, etiqueta) {
+    const n = numeroWhatsapp(tel);
+    if (!n) return '';
+    return `<a class="wa-btn" href="https://wa.me/${n}?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">${ICONO_WA}${esc(etiqueta)}</a>`;
+  }
+  function primerNombre(nombre) { return String(nombre || '').trim().split(/\s+/)[0] || ''; }
+  // Recordatorio de cuota según cómo está su cuenta
+  function mensajeCuota(c, cuenta) {
+    const hola = 'Hola ' + primerNombre(c.nombre) + '! Te escribimos de ORIGO: ';
+    const fin = ' Podés abonarla en efectivo o por transferencia. ¡Gracias!';
+    if (cuenta.estado === 'Sin pagos') return hola + 'todavía no tenemos registrado el pago de tu cuota.' + fin;
+    const mes = MESES[new Date(cuenta.vencimiento + 'T00:00:00').getMonth()].toLowerCase();
+    if (cuenta.estado === 'Vencido') return hola + 'el plazo para pagar tu cuota venció el ' + formatFechaCorta(cuenta.limite) + '. Mientras tanto no vas a poder reservar turnos nuevos.' + fin;
+    if (cuenta.estado === 'En período de pago') return hola + 'ya podés abonar la cuota de ' + mes + '; tenés tiempo hasta el ' + formatFechaCorta(cuenta.limite) + '.' + fin;
+    return hola + 'te recordamos que la cuota de ' + mes + ' se paga del ' + formatFechaCorta(cuenta.inicioPlazo) + ' al ' + formatFechaCorta(cuenta.limite) + '.' + fin;
+  }
+  function botonRecordatorioCuota(data, c) {
+    if (!c || esPrueba(c.dni) || c.estado !== 'Activo') return '';
+    const cuenta = cuotaDisplay(data, c.dni);
+    if (cuenta.prioridad > 1) return '';
+    return botonWhatsapp(c.telefono, mensajeCuota(c, cuenta), 'Recordar cuota');
+  }
+  function mensajeConfirmarTurno(nombre, r) {
+    return 'Hola ' + primerNombre(nombre) + '! Te confirmamos tu clase en ORIGO el ' + fechaLarga(r.fecha).toLowerCase()
+      + ' a las ' + String(r.hora).slice(0, 5) + '. ¡Te esperamos!';
   }
 
   function registrosDe(data, dni, fecha, tipo) {
@@ -1565,6 +1661,8 @@
     fichaOrigen: 'clientes', // pestaña desde la que se abrió la ficha (para volver ahí)
     listaScrollY: 0,       // dónde estaba la lista al abrir la ficha
     nuevoClienteAbierto: false,
+    verMontos: false,
+    cobroAbierto: null,      // Turnos: reserva cuyo cliente se está cobrando ahí mismo        // Cuotas: los montos cobrados se ven recién al tocar "Mostrar montos"
     altaProspecto: null,     // código del cliente nuevo (sin cuenta) que se está dando de alta
     fijosEditando: null,     // administración: días fijos que se están eligiendo en la ficha ({ 'w|hora': true })
     confirmarRutinaId: null,
@@ -2089,20 +2187,22 @@
     `;
   }
 
+  // Barra de pestañas de administración: fija abajo, como la de los clientes
   function renderAdminTabs(tab) {
     const tabs = [
-      { id: 'resumen', label: 'Resumen' },
-      { id: 'clientes', label: 'Clientes' },
-      { id: 'planes', label: 'Planes' },
-      { id: 'cuotas', label: 'Cuotas' },
-      { id: 'asistencias', label: 'Turnos' },
-      { id: 'pro', label: 'Pro' },
+      { id: 'resumen', label: 'Inicio', ico: 'inicio' },
+      { id: 'asistencias', label: 'Turnos', ico: 'turnos' },
+      { id: 'cuotas', label: 'Cuotas', ico: 'cuotas' },
+      { id: 'clientes', label: 'Clientes', ico: 'clientes' },
+      { id: 'planes', label: 'Planes', ico: 'planes' },
+      ...(CONTROL_PRO_ACTIVO ? [{ id: 'pro', label: 'Pro', ico: 'midia' }] : []),
     ];
     const novedades = state.data ? novedadesTurnos(state.data).length : 0;
     return `
-      <div class="admin-tabs">
-        ${tabs.map(t => `<button class="admin-tab ${t.id===tab?'active':''}" data-admin-tab="${t.id}">${t.label}${
-          (t.id === 'asistencias' && novedades > 0) ? `<span class="tab-badge">${novedades}</span>` : ''}</button>`).join('')}
+      <div class="bottom-nav">
+        ${tabs.map(t => `<button class="nav-btn ${t.id===tab?'active':''}" data-admin-tab="${t.id}">
+            ${ICONOS[t.ico]}<span>${t.label}</span>${(t.id === 'asistencias' && novedades > 0) ? `<span class="nav-badge">${novedades}</span>` : ''}
+          </button>`).join('')}
       </div>`;
   }
 
@@ -2112,17 +2212,21 @@
     else if (state.adminTab === 'asistencias') body = renderAdminAsistencias(data);
     else if (state.adminTab === 'resumen') body = renderAdminResumen(data);
     else if (state.adminTab === 'planes') body = renderAdminPlanes(data);
-    else if (state.adminTab === 'pro') body = renderAdminPro(data);
+    else if (state.adminTab === 'pro' && CONTROL_PRO_ACTIVO) body = renderAdminPro(data);
     else body = renderAdminClientes(data, formError, formNotice);
 
+    const titulos = { resumen: 'Hoy', asistencias: 'Turnos', cuotas: 'Cuotas', clientes: 'Clientes', planes: 'Planes', pro: 'Pro' };
     return `
-      <div class="view" style="padding-bottom:40px;">
-        <h2>Administración</h2>
-        ${renderAdminTabs(state.adminTab)}
+      <div class="view" style="padding-bottom:40px; flex:1;">
+        <div class="admin-head">
+          <h2>${titulos[state.adminTab] || 'Administración'}</h2>
+          <button class="logout-btn" id="salirAdminBtn">Salir</button>
+        </div>
         ${body}
         <button class="link-btn" id="backToLoginBtn2" style="margin-top:24px;">← Salir de administración</button>
         <div class="pago-detalle" id="versionApp" style="margin-top:16px;">Versión ${VERSION_APP}</div>
       </div>
+      ${renderAdminTabs(state.adminTab)}
     `;
   }
 
@@ -2280,8 +2384,6 @@
     const pausados = clientes.filter(c => c.estado === 'Pausado');
     const bajas = clientes.filter(c => c.estado === 'Baja');
 
-    const facturacionProyectada = activos.reduce((sum, c) => sum + (c.precio || 0), 0);
-
     // Solo los activos: a un pausado o a una baja no hay cuota que reclamarle
     const cuentasDisplay = activos.map(c => cuotaDisplay(data, c.dni));
     const vencidos = cuentasDisplay.filter(e => e.estado === 'Vencido').length;
@@ -2291,6 +2393,29 @@
     const hoy = isoDate(ahora());
     const turnosHoy = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado').length;
     const asistieronHoy = reservas.filter(r => r.fecha === hoy && estadoEfectivo(r) === 'asistio').length;
+
+    // ---- Agenda: los próximos horarios de hoy con quiénes vienen ----
+    const AGENDA_MAX = 4;
+    const esFinde = [0, 6].includes(new Date(hoy + 'T00:00:00').getDay());
+    const hoyActivas = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado');
+    // un horario sigue "en curso" mientras no pasó la duración del turno
+    const enCurso = (hora) => turnoYaEmpezo(hoy, hora) && !turnoYaEmpezo(hoy, horaDeMinutos(minutosDe(hora) + DURACION_TURNO_MIN));
+    const horasAgenda = HORARIOS.filter(h => hoyActivas.some(r => String(r.hora).slice(0, 5) === h) && (!turnoYaEmpezo(hoy, h) || enCurso(h)));
+    const agendaTitulo = esFinde ? 'Hoy no hay turnos' : horasAgenda.length ? 'Próximos turnos de hoy' : 'Hoy';
+    const agendaHtml = esFinde ? '' : `
+        ${horasAgenda.length ? `<div class="agenda">${horasAgenda.slice(0, AGENDA_MAX).map(h => {
+          const lista = hoyActivas.filter(r => String(r.hora).slice(0, 5) === h)
+            .sort((a, b) => nombreDeDni(data, a.dni).localeCompare(nombreDeDni(data, b.dni), 'es'));
+          return `
+          <button class="agenda-fila ${enCurso(h) ? 'ahora' : ''}" data-jump-tab="asistencias" data-ir-hora="${h}">
+            <span class="agenda-hora">${h}${enCurso(h) ? '<small>ahora</small>' : ''}</span>
+            <span class="agenda-nombres">${lista.map(r => `<span class="${esPrimeraClase(data, r) ? 'nuevo' : ''}">${esc(nombreDeDni(data, r.dni))}</span>`).join('')}</span>
+          </button>`;
+        }).join('')}</div>` : `<div class="resumen-todobien" style="margin-bottom:12px;">No quedan turnos por hoy.</div>`}
+        <div class="agenda-pie">
+          <span>${turnosHoy} ${turnosHoy === 1 ? 'reservado' : 'reservados'} hoy · ${asistieronHoy} ${asistieronHoy === 1 ? 'asistió' : 'asistieron'}${horasAgenda.length > AGENDA_MAX ? ` · ${horasAgenda.length - AGENDA_MAX} horarios más` : ''}</span>
+          <button class="cancel-link" data-jump-tab="asistencias">Ver todo →</button>
+        </div>`;
 
     const pausasVencidas = pausados.filter(c => diasPausado(c) > MAX_DIAS_PAUSA).length;
     const sinMatricula = matriculaActiva() ? activos.filter(c => !(c.matricula && c.matricula.pagada)).length : 0;
@@ -2313,25 +2438,16 @@
       : `<div class="resumen-todobien">Todo en orden — no hay nada urgente para hoy.</div>`;
 
     return `
-        <p class="sub">Qué necesita tu atención hoy</p>
+        <p class="sub">${fechaCompleta(hoy)}</p>
 
         <div class="resumen-atencion-list">${atencionHtml}</div>
 
-        <div class="resumen-hero">
-          <div class="resumen-hero-label">Facturación proyectada este mes</div>
-          <div class="resumen-hero-num">${money(facturacionProyectada)}</div>
-          <div class="resumen-hero-sub">${activos.length} activos · ${pausados.length} pausados · ${bajas.length} de baja</div>
-        </div>
-
-        <button class="resumen-hoy-card" data-jump-tab="asistencias">
-          <div class="resumen-hoy-top">
-            <span class="resumen-hoy-titulo">Hoy</span>
-            <span class="resumen-hoy-ver">Ver en Turnos →</span>
-          </div>
-          <div class="resumen-hoy-stats">
-            <div class="resumen-hoy-stat"><span class="resumen-hoy-num">${turnosHoy}</span><span class="resumen-hoy-txt">reservados</span></div>
-            <div class="resumen-hoy-stat"><span class="resumen-hoy-num">${asistieronHoy}</span><span class="resumen-hoy-txt">asistieron</span></div>
-          </div>
+        <h2 style="font-size:16px; margin-top:4px;">${agendaTitulo}</h2>
+        ${agendaHtml}
+        <button class="resumen-hero" data-jump-tab="clientes" style="width:100%; text-align:left; cursor:pointer; font-family:inherit; color:inherit;">
+          <div class="resumen-hero-label">Clientes activos</div>
+          <div class="resumen-hero-num">${activos.length}</div>
+          <div class="resumen-hero-sub">${pausados.length} pausados · ${bajas.length} de baja · lo cobrado está en Cuotas</div>
         </button>
 
         <h2 style="font-size:16px; margin-top:24px;">Datos</h2>
@@ -2665,7 +2781,7 @@
             <a class="btn btn-primary rutina-abrir" href="${esc(r0.url)}" target="_blank" rel="noopener">Abrir</a>
           </div>` : `<div class="pago-detalle">Todavía no tiene rutinas cargadas.</div>`;
 
-    const proHtml = !esPro(c) ? '' : `
+    const proHtml = !(CONTROL_PRO_ACTIVO && esPro(c)) ? '' : `
         <div class="cuota-card ficha-card">
           <div class="cuota-nombre" style="margin-bottom:10px;">Control diario · últimos 7 días</div>
           ${data.registrosProListo ? tablaUltimosDiasPro(data, c.dni, hoyIso) : '<div class="pago-detalle">El control diario todavía no está activado en la base.</div>'}
@@ -2696,6 +2812,7 @@
           ${infoVencimientoHtml(ctx.cuenta)}
           ${ultimoPago ? `<div class="kv-row"><span class="k">Último pago</span><span class="v">${formatFecha(ultimoPago.fechaPago)} · ${money(ultimoPago.monto || 0)}</span></div>` : ''}
           ${matriculaHtml}
+          ${botonRecordatorioCuota(data, c) ? `<div class="cuota-acciones">${botonRecordatorioCuota(data, c)}</div>` : ''}
           <button class="slot-btn" data-ir-tab="pagos" style="width:100%; margin-top:10px;">Registrar pago o ver historial</button>
         </div>
 
@@ -3359,6 +3476,7 @@
             <span class="pill ${cuenta.pill}">${cuenta.label}</span>
           </div>
           ${infoVencimientoHtml(cuenta)}
+          ${botonRecordatorioCuota(data, c) ? `<div class="cuota-acciones">${botonRecordatorioCuota(data, c)}</div>` : ''}
           ${historialHtml}
           ${formRegistrarPagoHtml(data, c)}
         </div>`;
@@ -3390,6 +3508,12 @@
     const mesHoy = isoDate(ahora()).slice(0, 7);
     const pagosMes = pagosReales(data).filter(p => p.fechaPago.slice(0, 7) === mesHoy);
     const cobradoMes = pagosMes.reduce((sum, p) => sum + (p.monto || 0), 0);
+    // Lo cobrado, separado por forma de pago (efectivo y transferencia siempre; las otras si hubo)
+    const porMetodo = {};
+    pagosMes.forEach(p => { const m = p.metodoPago || 'Sin especificar'; porMetodo[m] = (porMetodo[m] || 0) + (p.monto || 0); });
+    const metodos = ['Efectivo', 'Transferencia'].concat(Object.keys(porMetodo).filter(m => m !== 'Efectivo' && m !== 'Transferencia'));
+    const ver = state.verMontos;
+    const monto = (n) => ver ? money(n) : '<span class="monto-oculto">$ •••••</span>';
 
     const nombreMes = MESES[ahora().getMonth()].toLowerCase();
     const cob = cobranzaDelMes(data);
@@ -3411,19 +3535,36 @@
           </details>` : '';
 
     return `
-        <p class="sub">Estado de cuentas${vencidos ? ' — ' + vencidos + ' necesitan atención' : ''}</p>
+        <p class="sub">Estado de cuentas${vencidos ? ' — ' + vencidos + (vencidos === 1 ? ' necesita atención' : ' necesitan atención') : ''}</p>
         <div class="cuota-card" style="margin-bottom:12px;">
           <div class="cuota-top">
             <div class="cuota-nombre">Cobranza de ${nombreMes}</div>
             ${cobPill}
           </div>
           <div class="asis-semana-top" style="margin-top:10px;"><span>Activos con el mes pago</span><span>${cob.pagaron} de ${cob.total}</span></div>
-          <div class="asis-bar" style="margin-bottom:10px;"><i style="width:${cob.total ? Math.round(cob.pagaron / cob.total * 100) : 0}%"></i></div>
-          <div class="kv-row"><span class="k">Cobrado en ${nombreMes}</span><span class="v">${money(cobradoMes)}</span></div>
-          <div class="kv-row"><span class="k">Falta cobrar (aprox.)</span><span class="v">${money(cob.faltaCobrar)}</span></div>
-          <div class="kv-row"><span class="k">Pagos registrados este mes</span><span class="v">${pagosMes.length}</span></div>
-          ${faltanHtml}
+          <div class="asis-bar"><i style="width:${cob.total ? Math.round(cob.pagaron / cob.total * 100) : 0}%"></i></div>
         </div>
+
+        <div class="cuota-card recaudado-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Cobrado en ${nombreMes}</div>
+            <button class="ojo-btn ${ver ? 'on' : ''}" id="verMontosBtn">${ver ? 'Ocultar montos' : 'Mostrar montos'}</button>
+          </div>
+          ${metodos.map(m => `<div class="kv-row"><span class="k">${esc(m)}</span><span class="v">${monto(porMetodo[m] || 0)}</span></div>`).join('')}
+          <div class="recaudado-total"><span class="k">Total cobrado</span><span class="v">${monto(cobradoMes)}</span></div>
+          <div class="pago-detalle">${pagosMes.length} ${pagosMes.length === 1 ? 'pago registrado' : 'pagos registrados'} este mes. Solo cuenta lo que ya se cobró.</div>
+        </div>
+
+        ${cob.faltan.length ? `
+        <div class="cuota-card pendiente-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Pendiente de cobro</div>
+            <span class="pill pill-amber">${cob.faltan.length} ${cob.faltan.length === 1 ? 'cliente' : 'clientes'}</span>
+          </div>
+          <div class="kv-row"><span class="k">Falta cobrar (aprox.)</span><span class="v">${monto(cob.faltaCobrar)}</span></div>
+          <div class="pago-detalle">No está sumado en lo cobrado: es lo que todavía deben este mes.</div>
+          ${ver ? faltanHtml : faltanHtml.replace(/<span class="monto">[^<]*<\/span>/g, '<span class="monto monto-oculto">$ •••••</span>')}
+        </div>` : ''}
         <button class="btn btn-ghost" id="exportPagosBtn" style="width:100%;">Descargar historial de pagos (Excel)</button>
         ${seccion('Necesitan atención', urgentes)}
         ${seccion('Por vencer o para pagar', proximos)}
@@ -3627,19 +3768,27 @@
         const ef = estadoEfectivo(abierta);
         const existe = data.clientes.some(c => c.dni === abierta.dni);
         const prospecto = esProspecto(abierta.dni) ? datosProspecto(abierta.dni) : null;
+        const clienteAb = data.clientes.find(c => c.dni === abierta.dni) || null;
+        const cuentaAb = clienteAb && !esPrueba(clienteAb.dni) && clienteAb.estado === 'Activo' ? cuotaDisplay(data, clienteAb.dni) : null;
         const telLimpio = prospecto ? prospecto.telefono.replace(/[^\d+]/g, '') : '';
         accionesHtml = `
           <div class="th-acciones">
             <span class="quien">${esc(nombreDeDni(data, abierta.dni))}${ef === 'reservado' ? '' : ef === 'no_asistio' ? ' · figura que faltó' : ' · figura que asistió'}${
               prospecto ? ` · cliente nuevo, todavía sin cuenta${prospecto.telefono ? ' · ' + esc(prospecto.telefono) : ''}` : esPrimeraClase(data, abierta) ? ' · primera clase' : ''}${
               esTurnoFijo(abierta) ? ' · turno fijo' : ''}</span>
-            ${prospecto ? `${telLimpio ? `<a class="asist-btn" href="tel:${esc(telLimpio)}" style="text-decoration:none;">Llamar</a>` : ''}
+            ${prospecto ? `${botonWhatsapp(prospecto.telefono, mensajeConfirmarTurno(prospecto.nombre, abierta), 'Confirmar turno')}
+            ${telLimpio ? `<a class="asist-btn" href="tel:${esc(telLimpio)}" style="text-decoration:none;">Llamar</a>` : ''}
             <button class="asist-btn" data-alta-nuevo="${esc(abierta.dni)}" style="border-color:var(--nuevo); color:var(--nuevo);">Dar de alta</button>` : ''}
+            ${clienteAb && ef === 'reservado' && esPrimeraClase(data, abierta) ? botonWhatsapp(clienteAb.telefono, mensajeConfirmarTurno(clienteAb.nombre, abierta), 'Confirmar turno') : ''}
+            ${cuentaAb ? `<span class="pill ${cuentaAb.pill}">Cuota: ${cuentaAb.label}</span>` : ''}
+            ${cuentaAb && cuentaAb.prioridad <= 1 ? `<button class="asist-btn" data-cobro-toggle="${abierta.id}" style="border-color:var(--amber); color:var(--amber);">${state.cobroAbierto === abierta.id ? 'Cerrar cobro' : 'Registrar pago'}</button>
+            ${botonRecordatorioCuota(data, clienteAb)}` : ''}
             ${empezo ? `
             <button class="asist-btn asist-si ${ef==='asistio'?'active':''}" data-asist-id="${abierta.id}" data-asist-val="asistio">Asistió</button>
             <button class="asist-btn asist-no ${ef==='no_asistio'?'active':''}" data-asist-id="${abierta.id}" data-asist-val="no_asistio">No asistió</button>` : ''}
             <button class="asist-btn" data-cancelar-admin="${abierta.id}">Cancelar turno</button>
             ${existe ? `<button class="asist-btn" data-ficha-dni="${abierta.dni}">Ver ficha</button>` : ''}
+            ${cuentaAb && cuentaAb.prioridad <= 1 && state.cobroAbierto === abierta.id ? `<div class="cobro-rapido">${formRegistrarPagoHtml(data, clienteAb)}</div>` : ''}
           </div>`;
       }
 
@@ -3766,7 +3915,7 @@
   // Botones de la pestaña Turnos de administración
   function wireTurnosAdmin(root) {
     const on = (sel, fn) => root.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
-    const cerrar = () => { state.anotarEn = null; state.reservaAbierta = null; };
+    const cerrar = () => { state.anotarEn = null; state.reservaAbierta = null; state.cobroAbierto = null; };
     on('[data-turnos-vista]', el => { state.turnosVista = el.dataset.turnosVista; cerrar(); renderApp(); });
     on('[data-turnos-semana]', el => {
       const d = new Date(fechaAdminTurnos() + 'T00:00:00');
@@ -3788,11 +3937,14 @@
     if (fechaInput) fechaInput.onchange = (e) => { if (e.target.value) { state.asistenciasFecha = e.target.value; cerrar(); renderApp(); } };
 
     on('[data-persona]', el => {
+      state.cobroAbierto = null;
       state.reservaAbierta = state.reservaAbierta === el.dataset.persona ? null : el.dataset.persona;
       state.anotarEn = null;
       renderApp();
     });
     on('.asist-btn[data-asist-id]', el => marcarAsistencia(el.dataset.asistId, el.dataset.asistVal));
+    on('[data-cobro-toggle]', el => { state.cobroAbierto = state.cobroAbierto === el.dataset.cobroToggle ? null : el.dataset.cobroToggle; renderApp(); });
+    wirePagos(root);
     on('[data-cancelar-admin]', el => { el.disabled = true; cancelarDesdeAdmin(el.dataset.cancelarAdmin); });
 
     on('[data-anotar-hora]', el => {
@@ -4602,7 +4754,7 @@
 
   function renderNav(view) {
     const items = [
-      ...(esPro(state.cliente) ? [{id:'midia', label:'Mi día'}] : []),
+      ...(CONTROL_PRO_ACTIVO && esPro(state.cliente) ? [{id:'midia', label:'Mi día'}] : []),
       {id:'perfil', label:'Perfil'},
       {id:'rutina', label:'Rutina'},
       {id:'turnos', label:'Turnos'},
@@ -4636,10 +4788,13 @@
         btn.onclick = () => {
           cerrarFicha();
           state.fichaOrigen = 'clientes';
+          state.verMontos = false; // al salir de Cuotas los montos se vuelven a ocultar
           state.adminTab = btn.dataset.adminTab;
           state.anotarEn = null;
           state.reservaAbierta = null;
+          state.cobroAbierto = null;
           renderApp();
+          window.scrollTo(0, 0);
           actualizarPorDetras();
         };
       });
@@ -4652,7 +4807,9 @@
         barra.scrollLeft = Math.max(0, (tabActiva.offsetLeft - barra.offsetLeft) - (barra.clientWidth - tabActiva.offsetWidth) / 2);
       }
 
-      document.getElementById('backToLoginBtn2').onclick = () => { state.mode = 'login'; cerrarFicha(); state.fichaOrigen = 'clientes'; state.nuevoClienteAbierto = false; state.anotarEn = null; state.reservaAbierta = null; renderApp(); };
+      const salirAdmin = () => { state.mode = 'login'; state.verMontos = false; cerrarFicha(); state.fichaOrigen = 'clientes'; state.nuevoClienteAbierto = false; state.anotarEn = null; state.reservaAbierta = null; renderApp(); };
+      document.getElementById('backToLoginBtn2').onclick = salirAdmin;
+      document.getElementById('salirAdminBtn').onclick = salirAdmin;
 
       // Cualquier nombre o tarjeta de cliente abre su ficha
       root.querySelectorAll('[data-ficha-dni]').forEach(btn => {
@@ -4682,6 +4839,8 @@
         wirePagos(root);
         const exportBtn = document.getElementById('exportPagosBtn');
         if (exportBtn) exportBtn.onclick = descargarPagosExcel;
+        const verBtn = document.getElementById('verMontosBtn');
+        if (verBtn) verBtn.onclick = () => { state.verMontos = !state.verMontos; redibujarConservando(); };
       }
 
       if (state.adminTab === 'planes') {
@@ -4709,7 +4868,14 @@
         const backupBtn = document.getElementById('backupBtn');
         if (backupBtn) backupBtn.onclick = descargarBackup;
         root.querySelectorAll('[data-jump-tab]').forEach(btn => {
-          btn.onclick = () => { state.adminTab = btn.dataset.jumpTab; renderApp(); };
+          btn.onclick = () => {
+            state.adminTab = btn.dataset.jumpTab;
+            if (btn.dataset.irHora) { state.asistenciasFecha = isoDate(ahora()); state.turnosVista = 'dia'; }
+            renderApp();
+            window.scrollTo(0, 0);
+            const destino = btn.dataset.irHora && document.querySelector(`[data-th="${btn.dataset.irHora}"]`);
+            if (destino) destino.scrollIntoView({ block: 'center' });
+          };
         });
       }
       return;
@@ -4732,7 +4898,7 @@
       return;
     }
 
-    if (state.view === 'midia' && !esPro(state.cliente)) state.view = 'perfil';
+    if (state.view === 'midia' && !(CONTROL_PRO_ACTIVO && esPro(state.cliente))) state.view = 'perfil';
 
     let body = '';
     if (state.view === 'perfil') body = renderPerfil(state.cliente, state.data);
@@ -4977,7 +5143,7 @@
     state.loginDni = null;
     recordarDni(found.dni);
     // Los clientes PRO entran directo a su control diario
-    state.view = esPro(found) ? 'midia' : 'perfil';
+    state.view = CONTROL_PRO_ACTIVO && esPro(found) ? 'midia' : 'perfil';
     state.proAbierto = undefined;
     state.proDraft = {};
     state.selectedDate = primerDiaConTurnos();
