@@ -25,6 +25,7 @@
     --green-dim: #1E3A73;
     --amber: #F2A93B;
     --red: #E1584F;
+    --nuevo: #2BB673; /* clientes nuevos, hasta su primera clase */
     --text: #F3F6F1;
     --text-muted: #93A19C;
     --radius: 3px;
@@ -779,6 +780,27 @@
   }
   .anotar-op small { font-size: 12px; color: var(--text-muted); text-align: right; }
   .anotar-op small.aviso { color: var(--amber); }
+  .anotar-op small.nuevo { color: var(--nuevo); }
+
+  /* Clientes nuevos (hasta su primera clase) y turnos fijos */
+  .persona.nuevo { border-color: var(--nuevo); color: var(--nuevo); background: rgba(43,182,115,0.12); }
+  .persona.nuevo.porvenir { background: rgba(43,182,115,0.06); }
+  .persona .marca { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; margin-left: 6px; opacity: 0.85; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted); margin: -2px 0 12px; }
+  .leyenda i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+  .anotar-nuevo { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .anotar-nuevo .campos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+  .anotar-nuevo .slot-btn { width: 100%; }
+  .aviso-alta { border-left: 3px solid var(--nuevo); padding: 10px 12px; background: rgba(43,182,115,0.08); font-size: 13px; line-height: 1.5; margin-bottom: 14px; border-radius: var(--radius); }
+  .fijos-grid { display: grid; grid-template-columns: 52px repeat(5, 1fr); gap: 4px; margin: 10px 0; }
+  .fijos-grid .sg-head { font-size: 11px; text-align: center; color: var(--text-muted); text-transform: uppercase; }
+  .fijos-grid .sg-hora { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; }
+  .fijo-celda {
+    height: 30px; border: 1px solid var(--line); border-radius: var(--radius); background: transparent;
+    color: var(--text); cursor: pointer; font-size: 13px; font-weight: 700; padding: 0;
+  }
+  .fijo-celda.on { background: var(--green); border-color: var(--green); }
+  .tag-fijo { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--green); border: 1px solid var(--green); border-radius: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
 
   /* ---------- Admin: lista de clientes y ficha ---------- */
   .cli-list { display: flex; flex-direction: column; gap: 8px; }
@@ -861,7 +883,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '22/10/2026 · 30';
+  const VERSION_APP = '18/11/2026 · 31';
 
   const CUPO = 4; // personas por turno
   const MAX_TURNOS_POR_DIA = 2;
@@ -1097,8 +1119,10 @@
     // queda definido para que los pagos viejos de ese tipo se sigan mostrando bien.
     { id: '15d', label: '15 días', tipo: 'dias',  valor: 15, factor: 0.5, oculta: true },
     { id: '1m',  label: '1 mes',   tipo: 'meses', valor: 1,  factor: 1 },
-    { id: '3m',  label: '3 meses', tipo: 'meses', valor: 3,  factor: 3 },
-    { id: '6m',  label: '6 meses', tipo: 'meses', valor: 6,  factor: 6 },
+    // Ya no se ofrecen (como máximo se paga 1 mes), pero quedan definidas para
+    // que los pagos viejos de ese tipo se sigan mostrando bien.
+    { id: '3m',  label: '3 meses', tipo: 'meses', valor: 3,  factor: 3, oculta: true },
+    { id: '6m',  label: '6 meses', tipo: 'meses', valor: 6,  factor: 6, oculta: true },
   ];
 
   // ---- Pagos "hasta fin de mes": sirven para que todos queden venciendo el día 1 ----
@@ -1108,15 +1132,16 @@
   // REDONDEO_PROPORCIONAL. Después paga el mes completo cuando le toca.
   // (No tiene en cuenta feriados.)
   const REDONDEO_PROPORCIONAL = 100;
-  const REDONDEO_SEMANAS = 500; // solo para mostrar bien los pagos viejos por semanas
+  const REDONDEO_SEMANAS = 500; // los pagos por semanas se redondean a este múltiplo
   const DURACIONES_FIN_DE_MES = [
     { id: 'fm-prop', label: 'Proporcional hasta fin de mes', corto: 'Proporcional', tipo: 'finmes', proporcional: true },
     { id: 'fm-mes', label: 'Mes en curso (cuota completa)', corto: 'Mes en curso', tipo: 'finmes', semanas: 4, factor: 1 },
-    // Ya no se ofrecen (los reemplaza el proporcional), pero quedan definidas para
-    // que los pagos viejos de ese tipo se sigan mostrando bien.
-    { id: 'fm-3s',  label: '3 semanas hasta fin de mes',    corto: '3 semanas',    tipo: 'finmes', semanas: 3, factor: 0.75, oculta: true },
-    { id: 'fm-2s',  label: '2 semanas hasta fin de mes',    corto: '2 semanas',    tipo: 'finmes', semanas: 2, factor: 0.5, oculta: true },
-    { id: 'fm-1s',  label: '1 semana hasta fin de mes',     corto: '1 semana',     tipo: 'finmes', semanas: 1, factor: 0.25, oculta: true },
+    // Por semanas: cada semana vale la cuota ÷ 4. Sirven para el que arranca a
+    // mitad de mes y cumple sus días de la semana (por ejemplo, viene 3 días y
+    // arranca un miércoles): paga la semana entera y no el proporcional.
+    { id: 'fm-1s',  label: '1 semana hasta fin de mes',     corto: '1 semana',     tipo: 'finmes', semanas: 1, factor: 0.25 },
+    { id: 'fm-2s',  label: '2 semanas hasta fin de mes',    corto: '2 semanas',    tipo: 'finmes', semanas: 2, factor: 0.5 },
+    { id: 'fm-3s',  label: '3 semanas hasta fin de mes',    corto: '3 semanas',    tipo: 'finmes', semanas: 3, factor: 0.75 },
   ];
   const DURACION_PROPORCIONAL = DURACIONES_FIN_DE_MES[0];
 
@@ -1160,14 +1185,24 @@
     return Math.round((primerDiaMesSiguiente(base) - base) / 86400000);
   }
 
+  // Semanas que se le cobran al que arranca en 'base' hasta fin de mes: los días
+  // hábiles que quedan, de a 5 por semana, redondeando para arriba (el que
+  // arranca un miércoles y viene esos días paga la semana entera).
+  function semanasHastaFinDeMes(base) {
+    return Math.ceil(habilesHastaFinDeMes(base) / 5);
+  }
+
   // Qué pago "hasta fin de mes" corresponde si el período arranca en 'base':
   //  - si arranca un día 1 ya está ordenado: null (va el pago común de 1 mes)
-  //  - si no: el proporcional por los días hábiles que le quedan al mes
+  //  - si no: las semanas que le quedan al mes (o el mes completo si son 4 o más).
+  //    El proporcional por días hábiles queda como opción para los casos en que
+  //    no llega a cumplir sus días de esa semana.
   // 'base' es donde termina lo que el cliente ya tiene pago (o hoy si arranca).
   function sugerenciaFinDeMes(base) {
     if (base.getDate() === 1) return null;
     if (habilesHastaFinDeMes(base) === 0) return null; // no quedan días hábiles en el mes
-    return 'fm-prop';
+    const semanas = semanasHastaFinDeMes(base);
+    return semanas >= 4 ? 'fm-mes' : 'fm-' + semanas + 's';
   }
 
   function etiquetaProporcional(base) {
@@ -1197,8 +1232,9 @@
     }
 
     if (!sugerida) return desdeHoy ? `<optgroup label="Períodos completos">${comunes}</optgroup>${desdeHoy}` : comunes;
-    const finDeMes = opcion(DURACION_PROPORCIONAL, true, ' · sugerido', etiquetaProporcional(base))
-      + opcion(duracionPorId('fm-mes'), false);
+    const marca = (id) => id === sugerida ? ' · sugerido' : '';
+    const finDeMes = ['fm-1s', 'fm-2s', 'fm-3s', 'fm-mes'].map(id => opcion(duracionPorId(id), id === sugerida, marca(id))).join('')
+      + opcion(DURACION_PROPORCIONAL, sugerida === DURACION_PROPORCIONAL.id, marca(DURACION_PROPORCIONAL.id), etiquetaProporcional(base));
     return `<optgroup label="Para quedar venciendo el día 1">${finDeMes}</optgroup><optgroup label="Otros períodos">${comunes}</optgroup>${desdeHoy}`;
   }
 
@@ -1213,6 +1249,10 @@
           + ' de los ' + habilesDelMes(base) + ' del mes. ' + siguiente;
       }
       const dias = Math.round((venc - base) / 86400000);
+      if (dur.semanas && dur.semanas < 4) {
+        return 'Cobra ' + dur.semanas + (dur.semanas === 1 ? ' semana' : ' semanas') + ' (cuota ÷ 4 por semana) y cubre del '
+          + formatFechaCorta(isoDate(base)) + ' a fin de mes. ' + siguiente;
+      }
       return 'Cubre del ' + formatFechaCorta(isoDate(base)) + ' a fin de mes (' + dias + (dias === 1 ? ' día' : ' días') + '). ' + siguiente;
     }
     const texto = 'Este pago cubre del ' + formatFechaCorta(isoDate(base)) + ' al ' + formatFechaCorta(vencIso) + '.';
@@ -1344,6 +1384,141 @@
   function reservasReales(data) { return data.reservas.filter(r => !esPrueba(r.dni)); }
   function pagosReales(data) { return data.pagos.filter(p => !esPrueba(p.dni)); }
 
+  // ---------------- Clientes nuevos (todavía sin cuenta) ----------------
+  // Al que todavía no arrancó se lo anota desde Turnos solo con nombre y
+  // teléfono. Sus turnos se guardan con un código en lugar del DNI:
+  // 'nuevo|<id>|<nombre>|<teléfono>'. Cuando se lo da de alta como cliente, sus
+  // turnos pasan a su DNI real. En Turnos se lo ve de otro color hasta su
+  // primera clase (lo mismo que a un cliente que todavía no vino nunca).
+  const PREFIJO_NUEVO = 'nuevo|';
+  function esProspecto(dni) { return String(dni || '').startsWith(PREFIJO_NUEVO); }
+  function codigoProspecto(nombre, telefono) {
+    const limpio = t => String(t || '').replace(/\|/g, ' ').replace(/\s+/g, ' ').trim();
+    return PREFIJO_NUEVO + Date.now().toString(36) + '|' + limpio(nombre) + '|' + limpio(telefono);
+  }
+  function datosProspecto(dni) {
+    const partes = String(dni || '').split('|');
+    return { nombre: partes[2] || 'Cliente nuevo', telefono: partes[3] || '' };
+  }
+  // Clientes nuevos que tienen algún turno activo (para volver a anotarlos)
+  function prospectosConTurnos(data) {
+    const vistos = {};
+    data.reservas.forEach(r => { if (esProspecto(r.dni) && r.estado !== 'cancelado') vistos[r.dni] = true; });
+    return Object.keys(vistos).map(dni => ({ dni, ...datosProspecto(dni) }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }
+  // true si este turno es la primera clase de la persona (todavía no vino a ninguna antes)
+  function esPrimeraClase(data, r) {
+    if (esProspecto(r.dni)) return true;
+    const clave = r.fecha + ' ' + String(r.hora).slice(0, 5);
+    return !data.reservas.some(x => x.dni === r.dni && x.id !== r.id && estadoEfectivo(x) === 'asistio'
+      && (x.fecha + ' ' + String(x.hora).slice(0, 5)) < clave);
+  }
+
+  // ---------------- Turnos fijos ----------------
+  // Administración le marca a un cliente los días y horarios que viene fijo.
+  // La app le reserva sola esos turnos en las semanas que se pueden reservar
+  // (si hay lugar, está activo y no tiene la cuota vencida). Él puede cancelar
+  // uno o cambiarlo por otro horario como cualquier reserva: el que canceló no
+  // se le vuelve a reservar. Cada horario fijo se guarda en la tabla "config"
+  // como una fila 'fijo_<dni>_<día 1-5>_<HHMM>' con valor 1, y cada turno
+  // reservado así lleva un id 'fijo-<dni>-<fecha>-<HHMM>' (nunca se duplica).
+  const CLAVE_FIJO = 'fijo_';
+  function claveFijo(dni, dia, hora) { return CLAVE_FIJO + dni + '_' + dia + '_' + String(hora).replace(':', ''); }
+  function fijosDe(dni) {
+    const cfg = state.data && state.data.config;
+    if (!cfg) return [];
+    const pref = CLAVE_FIJO + dni + '_';
+    return cfg.filter(c => String(c.clave).startsWith(pref) && Number(c.valor) === 1).map(c => {
+      const [dia, hhmm] = String(c.clave).slice(pref.length).split('_');
+      return { dia: parseInt(dia, 10), hora: String(hhmm).slice(0, 2) + ':' + String(hhmm).slice(2, 4) };
+    }).filter(f => f.dia >= 1 && f.dia <= 5 && HORARIOS.includes(f.hora))
+      .sort((a, b) => a.dia - b.dia || a.hora.localeCompare(b.hora));
+  }
+  function textoFijos(fijos) {
+    return fijos.map(f => DIAS_SEMANA[f.dia] + ' ' + f.hora).join(' · ');
+  }
+  function idFijo(dni, fecha, hora) { return 'fijo-' + dni + '-' + fecha + '-' + String(hora).replace(':', ''); }
+  function esTurnoFijo(r) { return String(r.id || '').startsWith('fijo-'); }
+
+  // Guarda los horarios fijos de un cliente (lista de { dia, hora }). Devuelve false si algo falló.
+  async function guardarFijos(dni, lista) {
+    const quiero = {};
+    lista.forEach(f => { quiero[claveFijo(dni, f.dia, f.hora)] = true; });
+    const pref = CLAVE_FIJO + dni + '_';
+    const filas = state.data.config.filter(c => String(c.clave).startsWith(pref));
+    let ok = true;
+    for (const clave of Object.keys(quiero)) {
+      const fila = filas.find(c => c.clave === clave);
+      if (fila && Number(fila.valor) === 1) continue;
+      const res = fila
+        ? await sb.from('config').update({ valor: 1 }).eq('clave', clave)
+        : await sb.from('config').insert({ clave, valor: 1 });
+      if (res.error) { ok = false; console.error('No se pudo guardar el día fijo:', res.error); }
+    }
+    for (const fila of filas) {
+      if (quiero[fila.clave]) continue;
+      // Primero se apaga (valor 0) y después se intenta borrar la fila
+      const res = await sb.from('config').update({ valor: 0 }).eq('clave', fila.clave);
+      if (res.error) { ok = false; console.error('No se pudo quitar el día fijo:', res.error); continue; }
+      await sb.from('config').delete().eq('clave', fila.clave);
+    }
+    return ok;
+  }
+
+  // Reserva los turnos fijos que falten en las semanas reservables. Se llama
+  // sola cada vez que se leen los datos (como mucho una vez por minuto).
+  let generandoFijos = false;
+  let ultimaGeneracionFijos = 0;
+  async function generarTurnosFijos(forzar) {
+    if (generandoFijos || !state.data || state.errorConexion) return;
+    if (!forzar && Date.now() - ultimaGeneracionFijos < 60000) return;
+    if (!state.data.config.some(c => String(c.clave).startsWith(CLAVE_FIJO))) return;
+    generandoFijos = true;
+    ultimaGeneracionFijos = Date.now();
+    try {
+      const data = state.data;
+      const dias = bookableWeekdays();
+      const nuevas = [];
+      data.clientes.forEach(c => {
+        if (c.estado !== 'Activo' || cuotaImpideReservar(data, c.dni)) return;
+        const fijos = fijosDe(c.dni);
+        if (!fijos.length) return;
+        dias.forEach(d => {
+          const fecha = isoDate(d);
+          fijos.filter(f => f.dia === d.getDay()).forEach(f => {
+            if (turnoYaEmpezo(fecha, f.hora)) return;
+            const id = idFijo(c.dni, fecha, f.hora);
+            if (data.reservas.some(r => r.id === id)) return; // ya se reservó (o lo canceló)
+            const delDia = data.reservas.filter(r => r.dni === c.dni && r.fecha === fecha);
+            if (delDia.some(r => String(r.hora).slice(0, 5) === f.hora)) return; // ya tiene (o canceló) ese horario
+            const activasDia = delDia.filter(r => r.estado !== 'cancelado');
+            if (activasDia.some(r => seSuperponen(String(r.hora).slice(0, 5), f.hora))) return;
+            if (activasDia.length + nuevas.filter(n => n.dni === c.dni && n.fecha === fecha).length >= MAX_TURNOS_POR_DIA) return;
+            const yaEnCola = nuevas.filter(n => n.fecha === fecha && n.hora === f.hora).length;
+            if (ocupadosEnTurno(data, fecha, f.hora, null) + yaEnCola >= CUPO) return; // sin lugar: se vuelve a probar más tarde
+            nuevas.push({ id, dni: c.dni, fecha, hora: f.hora, estado: 'reservado' });
+          });
+        });
+      });
+      if (!nuevas.length) return;
+      let hechas = 0;
+      for (const n of nuevas) {
+        let res = data.novedadesCompletas === false ? null : await sb.from('reservas').insert({ ...n, por_admin: true });
+        if (!res || res.error) res = await sb.from('reservas').insert(n);
+        if (!res.error) { hechas++; state.misAcciones['n-' + n.id] = true; }
+      }
+      if (hechas) {
+        await refreshData(true);
+        if (!hayAlgoEscrito()) redibujarConservando();
+      }
+    } catch (e) {
+      console.error('No se pudieron reservar los turnos fijos:', e);
+    } finally {
+      generandoFijos = false;
+    }
+  }
+
   // Lugares ocupados de un turno. Las reservas de un usuario de prueba no
   // cuentan, salvo para él mismo (así ve su propio turno descontado).
   function ocupadosEnTurno(data, fecha, hora, dniQueMira) {
@@ -1390,6 +1565,8 @@
     fichaOrigen: 'clientes', // pestaña desde la que se abrió la ficha (para volver ahí)
     listaScrollY: 0,       // dónde estaba la lista al abrir la ficha
     nuevoClienteAbierto: false,
+    altaProspecto: null,     // código del cliente nuevo (sin cuenta) que se está dando de alta
+    fijosEditando: null,     // administración: días fijos que se están eligiendo en la ficha ({ 'w|hora': true })
     confirmarRutinaId: null,
     asistenciasFecha: null,
     clienteBusqueda: '',
@@ -1732,6 +1909,8 @@
     // El cliente que tiene la sesión abierta pasa a ser el de los datos nuevos
     // (si el administrador le cambió el plan, el estado o una rutina, lo ve).
     if (state.cliente) state.cliente = state.data.clientes.find(c => c.dni === state.cliente.dni) || state.cliente;
+    // Turnos fijos: se reservan solos los que falten (sin frenar la pantalla)
+    setTimeout(() => generarTurnosFijos(false), 0);
   }
 
   // ---------------- Actualización por detrás ----------------
@@ -2190,6 +2369,7 @@
   function abrirFicha(dni, tab) {
     if (state.fichaDni !== dni) state.fichaMes = null;
     state.adminTab = 'clientes';
+    if (state.fijosEditando && state.fijosEditando.dni !== dni) state.fijosEditando = null;
     state.fichaDni = dni;
     state.fichaTab = tab || 'resumen';
     state.editingDni = state.fichaTab === 'editar' ? dni : null;
@@ -2200,6 +2380,7 @@
   }
 
   function cerrarFicha() {
+    state.fijosEditando = null;
     state.fichaDni = null;
     state.fichaTab = 'resumen';
     state.fichaMes = null;
@@ -2210,13 +2391,17 @@
 
   // Formulario de datos del cliente. Se usa para el alta (editing = null) y en la pestaña Editar de la ficha.
   function formClienteHtml(editing, formError) {
+    // Alta de un cliente nuevo que ya estaba anotado en Turnos: nombre y teléfono ya cargados
+    const pre = !editing && state.altaProspecto ? datosProspecto(state.altaProspecto) : null;
+    const nTurnos = pre ? state.data.reservas.filter(r => r.dni === state.altaProspecto && r.estado !== 'cancelado').length : 0;
     return `
+          ${pre ? `<div class="aviso-alta">Alta de <b>${esc(pre.nombre)}</b>, que estaba anotado como cliente nuevo.${nTurnos ? (nTurnos === 1 ? ' Su turno anotado pasa a su ficha.' : ` Sus ${nTurnos} turnos anotados pasan a su ficha.`) : ''} Completá DNI, contraseña y plan.</div>` : ''}
           <div class="admin-field-grid">
             <label>DNI<input type="text" id="fDni" inputmode="numeric" placeholder="Ej: 12345678" value="${editing?esc(editing.dni):''}" autocomplete="off"></label>
             <label>Contraseña<input type="text" id="fPass" placeholder="${editing?'Dejar en blanco para no cambiarla':'Elegí una contraseña'}" value=""></label>
-            <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?esc(editing.nombre):''}"></label>
+            <label class="span2">Nombre y apellido<input type="text" id="fNombre" placeholder="Ej: María Gómez" value="${editing?esc(editing.nombre):pre?esc(pre.nombre):''}"></label>
             <label>Email<input type="text" id="fEmail" placeholder="Ej: maria@mail.com" value="${editing?esc(editing.email||''):''}"></label>
-            <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?esc(editing.telefono||''):''}"></label>
+            <label>Teléfono<input type="text" id="fTelefono" placeholder="Ej: 341-1234567" value="${editing?esc(editing.telefono||''):pre?esc(pre.telefono):''}"></label>
             <label>Plan
               <select id="fPlan">
                 <option value="START" ${editing&&editing.plan==='START'?'selected':''}>START</option>
@@ -2466,7 +2651,7 @@
       : `<div class="kv-row"><span class="k">Matrícula</span><span class="v" style="color:var(--red);">Sin pagar · <button class="cancel-link" data-matricula-dni="${c.dni}">Registrar (${money(matriculaPrecio())})</button></span></div>`;
 
     const turnosHtml = ctx.proximas.length
-      ? ctx.proximas.slice(0, 3).map(r => `<div class="kv-row"><span class="k">${fechaLarga(r.fecha)}</span><span class="v">${String(r.hora).slice(0, 5)} hs</span></div>`).join('')
+      ? ctx.proximas.slice(0, 3).map(r => `<div class="kv-row"><span class="k">${fechaLarga(r.fecha)}</span><span class="v">${String(r.hora).slice(0, 5)} hs${esTurnoFijo(r) ? '<span class="tag-fijo">fijo</span>' : ''}</span></div>`).join('')
         + (ctx.proximas.length > 3 ? `<div class="pago-detalle" style="margin-top:4px;">y ${ctx.proximas.length - 3} más</div>` : '')
       : `<div class="pago-detalle">No tiene turnos reservados.</div>`;
 
@@ -2522,6 +2707,8 @@
           ${turnosHtml}
         </div>
 
+        ${fichaFijosHtml(data, c)}
+
         <div class="cuota-card ficha-card">
           <div class="cuota-top">
             <div class="cuota-nombre">Rutinas${ctx.rutinas.length ? ' (' + ctx.rutinas.length + ')' : ''}</div>
@@ -2539,6 +2726,75 @@
           ${estimulosHtml}
           <div class="kv-row"><span class="k">Turnos por semana</span><span class="v">${isFinite(limite) ? limite + (c.limiteSemanalOverride != null ? ' (excepción)' : '') : 'Sin límite'}</span></div>
         </div>`;
+  }
+
+  // Tarjeta "Días fijos" de la ficha: muestra los horarios fijos o, al editar, la grilla para elegirlos
+  function fichaFijosHtml(data, c) {
+    const fijos = fijosDe(c.dni);
+    const editando = state.fijosEditando && state.fijosEditando.dni === c.dni ? state.fijosEditando.sel : null;
+    if (!editando) {
+      let nota = '';
+      if (fijos.length && c.estado !== 'Activo') nota = 'No se le reservan mientras no esté activo.';
+      else if (fijos.length && cuotaImpideReservar(data, c.dni)) nota = 'No se le reservan mientras tenga la cuota vencida.';
+      return `
+        <div class="cuota-card ficha-card">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Días fijos</div>
+            <button class="cancel-link" data-fijos-editar="${c.dni}">${fijos.length ? 'Cambiar' : 'Marcar días fijos'}</button>
+          </div>
+          ${fijos.length
+            ? fijos.map(f => `<div class="kv-row"><span class="k">${DIAS_SEMANA[f.dia]}</span><span class="v">${f.hora} hs</span></div>`).join('')
+              + `<div class="pago-detalle" style="margin-top:6px; line-height:1.5;">Se le reservan solos cada semana. Si cancela uno o lo cambia de horario, ese no se le vuelve a reservar.${nota ? ' ' + nota : ''}</div>`
+            : `<div class="pago-detalle">No tiene días fijos. Marcalos y la app le reserva esos turnos cada semana.</div>`}
+        </div>`;
+    }
+    const marcados = Object.keys(editando).filter(k => editando[k]).length;
+    const limite = limiteSemanalDe(c);
+    const cabecera = '<div></div>' + [1, 2, 3, 4, 5].map(d => `<div class="sg-head">${DIAS_CORTO[d]}</div>`).join('');
+    const filas = HORARIOS.map(hora => `<div class="sg-hora">${hora}</div>` + [1, 2, 3, 4, 5].map(d => {
+      const k = d + '|' + hora;
+      return `<button class="fijo-celda ${editando[k] ? 'on' : ''}" data-fijo-celda="${k}" aria-label="${DIAS_SEMANA[d]} ${hora}" aria-pressed="${editando[k] ? 'true' : 'false'}">${editando[k] ? '✓' : ''}</button>`;
+    }).join('')).join('');
+    return `
+        <div class="cuota-card ficha-card" id="fijosCard">
+          <div class="cuota-top">
+            <div class="cuota-nombre">Días fijos</div>
+            <button class="cancel-link" data-fijos-cancelar="1">Cancelar</button>
+          </div>
+          <div class="pago-detalle" style="line-height:1.5;">Tocá los horarios en los que viene fijo. Marcados: <b id="fijosCuenta">${marcados}</b>${isFinite(limite) ? ` · su plan: ${limite} por semana` : ''}.</div>
+          ${isFinite(limite) && marcados > limite ? `<div class="pago-detalle" style="color:var(--amber); margin-top:4px;">Marcaste más turnos que los de su plan: se le reservan igual.</div>` : ''}
+          <div class="fijos-grid">${cabecera}${filas}</div>
+          <div class="error-text" id="fijosError"></div>
+          <button class="btn btn-primary" data-fijos-guardar="${c.dni}" style="width:100%;">Guardar días fijos</button>
+        </div>`;
+  }
+
+  async function guardarFijosDesdeFicha(dni) {
+    const ed = state.fijosEditando;
+    if (!ed || ed.dni !== dni) return;
+    const lista = Object.keys(ed.sel).filter(k => ed.sel[k]).map(k => {
+      const [dia, hora] = k.split('|');
+      return { dia: parseInt(dia, 10), hora };
+    });
+    const antes = fijosDe(dni);
+    const ok = await guardarFijos(dni, lista);
+    // Los turnos fijos ya reservados de horarios que se sacaron se cancelan
+    const sigue = (r) => {
+      const d = new Date(r.fecha + 'T00:00:00').getDay();
+      return lista.some(f => f.dia === d && f.hora === String(r.hora).slice(0, 5));
+    };
+    const sacar = state.data.reservas.filter(r => r.dni === dni && esTurnoFijo(r) && r.estado === 'reservado'
+      && !turnoYaEmpezo(r.fecha, r.hora) && !sigue(r));
+    for (const r of sacar) { state.misAcciones['c-' + r.id] = true; await marcarCancelada(r.id); }
+    await refreshData();
+    state.fijosEditando = null;
+    await generarTurnosFijos(true);
+    const ahoraFijos = fijosDe(dni);
+    const nuevos = state.data.reservas.filter(r => r.dni === dni && esTurnoFijo(r) && r.estado === 'reservado' && !turnoYaEmpezo(r.fecha, r.hora)).length;
+    showToast(!ok ? 'No se pudieron guardar todos los días fijos. Probá de nuevo.'
+      : !ahoraFijos.length ? (antes.length ? 'Ya no tiene días fijos.' + (sacar.length ? ' Se cancelaron sus turnos fijos reservados.' : '') : 'Sin días fijos.')
+      : 'Días fijos guardados. Tiene ' + nuevos + (nuevos === 1 ? ' turno fijo reservado' : ' turnos fijos reservados') + ' en las semanas que se pueden reservar.');
+    renderApp();
   }
 
   function fichaPagos(data, c, ctx) {
@@ -2635,8 +2891,8 @@
     const on = (sel, fn) => root.querySelectorAll(sel).forEach(el => { el.onclick = () => fn(el); });
     if (document.getElementById('addClienteBtn')) wireAdminForm();
 
-    on('#nuevoClienteBtn', () => { state.nuevoClienteAbierto = true; state.adminFormError = ''; state.adminFormNotice = ''; renderApp(); });
-    on('#cerrarNuevoBtn', () => { state.nuevoClienteAbierto = false; state.adminFormError = ''; renderApp(); });
+    on('#nuevoClienteBtn', () => { state.nuevoClienteAbierto = true; state.altaProspecto = null; state.adminFormError = ''; state.adminFormNotice = ''; renderApp(); });
+    on('#cerrarNuevoBtn', () => { state.nuevoClienteAbierto = false; state.altaProspecto = null; state.adminFormError = ''; renderApp(); });
 
     on('#fichaVolverBtn', () => {
       const origen = state.fichaOrigen || 'clientes';
@@ -2655,6 +2911,29 @@
       sel.onchange = () => cambiarEstadoCliente(sel.dataset.estadoDni, sel.value);
     });
     on('[data-matricula-dni]', el => registrarMatricula(el.dataset.matriculaDni));
+
+    // Días fijos: elegir en la grilla y guardar
+    on('[data-fijos-editar]', el => {
+      const sel = {};
+      fijosDe(el.dataset.fijosEditar).forEach(f => { sel[f.dia + '|' + f.hora] = true; });
+      state.fijosEditando = { dni: el.dataset.fijosEditar, sel };
+      renderApp();
+      const card = document.getElementById('fijosCard');
+      if (card) card.scrollIntoView({ block: 'start' });
+    });
+    on('[data-fijos-cancelar]', () => { state.fijosEditando = null; renderApp(); });
+    on('[data-fijo-celda]', el => {
+      const k = el.dataset.fijoCelda;
+      const sel = state.fijosEditando.sel;
+      sel[k] = !sel[k];
+      // Se actualiza solo la celda, sin redibujar (así la grilla no salta)
+      el.classList.toggle('on', !!sel[k]);
+      el.textContent = sel[k] ? '✓' : '';
+      el.setAttribute('aria-pressed', sel[k] ? 'true' : 'false');
+      const cuenta = document.getElementById('fijosCuenta');
+      if (cuenta) cuenta.textContent = Object.keys(sel).filter(x => sel[x]).length;
+    });
+    on('[data-fijos-guardar]', el => { el.disabled = true; el.textContent = 'Guardando…'; guardarFijosDesdeFicha(el.dataset.fijosGuardar); });
 
     // Rutinas: "Eliminar" primero pregunta
     on('[data-add-rutina]', el => agregarRutina(el.dataset.addRutina));
@@ -3184,7 +3463,7 @@
     reservasReales(data).forEach(r => {
       const cancelada = r.estado === 'cancelado';
       // Una reserva cancelada sin fecha de cancelación (la deshizo la app sola) no se avisa
-      if (r.creadoEn && r.creadoEn > desde && !state.misAcciones['n-' + r.id] && (!cancelada || r.canceladoEn)) {
+      if (r.creadoEn && r.creadoEn > desde && !state.misAcciones['n-' + r.id] && !esTurnoFijo(r) && (!cancelada || r.canceladoEn)) {
         lista.push({ clave: 'n-' + r.id, tipo: r.porAdmin ? 'anotado' : 'reserva', t: r.creadoEn, r });
       }
       if (cancelada && r.canceladoEn && r.canceladoEn > desde && !state.misAcciones['c-' + r.id]) {
@@ -3196,7 +3475,8 @@
 
   function nombreDeDni(data, dni) {
     const c = data.clientes.find(x => x.dni === dni);
-    return c ? c.nombre : 'DNI ' + dni;
+    if (c) return c.nombre;
+    return esProspecto(dni) ? datosProspecto(dni).nombre : 'DNI ' + dni;
   }
 
   function textoNovedad(data, e) {
@@ -3336,7 +3616,9 @@
       const personas = items.map(r => {
         const ef = estadoEfectivo(r);
         const clase = ef === 'no_asistio' ? 'falto' : ef === 'reservado' ? 'porvenir' : '';
-        return `<button class="persona ${clase} ${state.reservaAbierta === r.id ? 'abierta' : ''}" data-persona="${r.id}">${esc(nombreDeDni(data, r.dni))}</button>`;
+        const nuevo = esPrimeraClase(data, r);
+        const marcas = (nuevo ? '<span class="marca">nuevo</span>' : '') + (esTurnoFijo(r) ? '<span class="marca">fijo</span>' : '');
+        return `<button class="persona ${clase} ${nuevo ? 'nuevo' : ''} ${state.reservaAbierta === r.id ? 'abierta' : ''}" data-persona="${r.id}">${esc(nombreDeDni(data, r.dni))}${marcas}</button>`;
       }).join('');
 
       const abierta = items.find(r => r.id === state.reservaAbierta);
@@ -3344,9 +3626,15 @@
       if (abierta) {
         const ef = estadoEfectivo(abierta);
         const existe = data.clientes.some(c => c.dni === abierta.dni);
+        const prospecto = esProspecto(abierta.dni) ? datosProspecto(abierta.dni) : null;
+        const telLimpio = prospecto ? prospecto.telefono.replace(/[^\d+]/g, '') : '';
         accionesHtml = `
           <div class="th-acciones">
-            <span class="quien">${esc(nombreDeDni(data, abierta.dni))}${ef === 'reservado' ? '' : ef === 'no_asistio' ? ' · figura que faltó' : ' · figura que asistió'}</span>
+            <span class="quien">${esc(nombreDeDni(data, abierta.dni))}${ef === 'reservado' ? '' : ef === 'no_asistio' ? ' · figura que faltó' : ' · figura que asistió'}${
+              prospecto ? ` · cliente nuevo, todavía sin cuenta${prospecto.telefono ? ' · ' + esc(prospecto.telefono) : ''}` : esPrimeraClase(data, abierta) ? ' · primera clase' : ''}${
+              esTurnoFijo(abierta) ? ' · turno fijo' : ''}</span>
+            ${prospecto ? `${telLimpio ? `<a class="asist-btn" href="tel:${esc(telLimpio)}" style="text-decoration:none;">Llamar</a>` : ''}
+            <button class="asist-btn" data-alta-nuevo="${esc(abierta.dni)}" style="border-color:var(--nuevo); color:var(--nuevo);">Dar de alta</button>` : ''}
             ${empezo ? `
             <button class="asist-btn asist-si ${ef==='asistio'?'active':''}" data-asist-id="${abierta.id}" data-asist-val="asistio">Asistió</button>
             <button class="asist-btn asist-no ${ef==='no_asistio'?'active':''}" data-asist-id="${abierta.id}" data-asist-val="no_asistio">No asistió</button>` : ''}
@@ -3358,7 +3646,11 @@
       let anotarHtml = '';
       if (anotando) {
         const yaEstan = items.map(r => r.dni);
-        const opciones = candidatos.filter(c => !yaEstan.includes(c.dni)).map(c => {
+        const opcionesNuevos = prospectosConTurnos(data).filter(p => !yaEstan.includes(p.dni)).map(p => `
+                  <button class="anotar-op" data-anotar-dni="${esc(p.dni)}" data-buscar="${esc(p.nombre.toLowerCase())} ${esc(p.telefono)}">
+                    <span>${esc(p.nombre)}</span><small class="nuevo">cliente nuevo</small>
+                  </button>`).join('');
+        const opciones = opcionesNuevos + candidatos.filter(c => !yaEstan.includes(c.dni)).map(c => {
           const limite = limiteSemanalDe(c);
           const enSemana = reservasEnSemana(data, c.dni, fecha).length;
           const enDia = delDia.filter(r => r.dni === c.dni).length;
@@ -3375,6 +3667,15 @@
             <input type="text" id="anotarBuscar" placeholder="Buscar cliente por nombre o DNI" autocomplete="off">
             <div id="anotarLista">${opciones || '<div class="pago-detalle" style="padding:10px 0;">No hay más clientes activos para anotar.</div>'}</div>
             <div class="pago-detalle" id="anotarResto" style="padding-top:8px;"></div>
+            <div class="anotar-nuevo">
+              <div class="pago-detalle">¿Todavía no es cliente? Anotalo con nombre y teléfono; cuando arranque lo das de alta.</div>
+              <div class="campos">
+                <input type="text" id="nuevoNombre" placeholder="Nombre y apellido" autocomplete="off">
+                <input type="text" id="nuevoTel" inputmode="tel" placeholder="Teléfono" autocomplete="off">
+              </div>
+              <div class="error-text" id="nuevoError"></div>
+              <button class="slot-btn" id="anotarNuevoBtn">Anotar como cliente nuevo</button>
+            </div>
           </div>`;
       }
 
@@ -3408,6 +3709,7 @@
         <div class="sem">${tira}</div>
         <p class="turnos-dia" style="margin-bottom:10px;">${fechaCompleta(fecha)}${fecha === hoyIso ? ' (hoy)' : ''}</p>
         ${resumenHtml}
+        ${delDia.some(r => esPrimeraClase(data, r)) ? `<div class="leyenda"><span><i style="background:var(--nuevo)"></i>Cliente nuevo: todavía no vino a ninguna clase</span></div>` : ''}
         ${HORARIOS.map(fila).join('')}
         <label class="pago-detalle" style="display:block; margin-top:16px;">Ir a otra fecha
           <input type="date" id="asistFechaInput" value="${fecha}" class="date-input" style="margin:6px 0 0;" />
@@ -3418,7 +3720,8 @@
   // Anota a un cliente en un turno desde administración. Respeta el cupo del
   // horario, pero no los límites del plan (si lo anota el profe es una excepción).
   async function anotarDesdeAdmin(dni, fecha, hora) {
-    const cliente = state.data.clientes.find(c => c.dni === dni);
+    const cliente = state.data.clientes.find(c => c.dni === dni)
+      || (esProspecto(dni) ? { dni, nombre: datosProspecto(dni).nombre } : null);
     if (!cliente) return;
     const frescas = await reservasFrescasDelDia(fecha);
     if (!frescas) { showToast('No se pudo comprobar el cupo. Probá de nuevo.'); return; }
@@ -3523,6 +3826,31 @@
       const hora = el.closest('[data-anotar-panel]').dataset.anotarPanel;
       document.querySelectorAll('#anotarLista .anotar-op').forEach(b => { b.disabled = true; });
       anotarDesdeAdmin(el.dataset.anotarDni, fechaAdminTurnos(), hora);
+    });
+    // Cliente nuevo sin cuenta: se anota con nombre y teléfono
+    on('#anotarNuevoBtn', el => {
+      const nombre = document.getElementById('nuevoNombre').value.trim();
+      const telefono = document.getElementById('nuevoTel').value.trim();
+      const err = document.getElementById('nuevoError');
+      if (nombre.length < 2) { err.textContent = 'Escribí al menos el nombre.'; return; }
+      const hora = el.closest('[data-anotar-panel]').dataset.anotarPanel;
+      el.disabled = true;
+      anotarDesdeAdmin(codigoProspecto(nombre, telefono), fechaAdminTurnos(), hora);
+    });
+    // Dar de alta a un cliente nuevo: abre el alta con sus datos ya cargados
+    on('[data-alta-nuevo]', el => {
+      const codigo = el.dataset.altaNuevo;
+      cerrarFicha();
+      state.anotarEn = null;
+      state.reservaAbierta = null;
+      state.adminTab = 'clientes';
+      state.fichaOrigen = 'clientes';
+      state.nuevoClienteAbierto = true;
+      state.altaProspecto = codigo;
+      state.adminFormError = '';
+      state.adminFormNotice = '';
+      renderApp();
+      window.scrollTo(0, 0);
     });
   }
 
@@ -3902,7 +4230,7 @@
       .map(r => {
         if (r.dni === dniQueMira) return { nombre: 'Vos', yo: true };
         const c = data.clientes.find(x => x.dni === r.dni);
-        return { nombre: c ? c.nombre : 'Otro cliente', yo: false };
+        return { nombre: c ? c.nombre : esProspecto(r.dni) ? datosProspecto(r.dni).nombre : 'Otro cliente', yo: false };
       });
   }
 
@@ -4110,7 +4438,7 @@
           <div>
             <div class="et">Tu próximo turno</div>
             <div class="hora">${String(sig.hora).slice(0, 5)}</div>
-            <div class="dia">${diaCercano(sig.fecha)}</div>
+            <div class="dia">${diaCercano(sig.fecha)}${esTurnoFijo(sig) ? '<span class="tag-fijo">fijo</span>' : ''}</div>
           </div>
           <button class="cancel-link" data-cancelar-id="${sig.id}">Cancelar</button>
         </div>` : `
@@ -4119,11 +4447,13 @@
           ${cliente.estado === 'Activo' ? `<button class="btn btn-primary" id="irATurnosBtn" style="width:100%;">Reservar un turno</button>` : ''}
         </div>`;
 
+    const misFijos = fijosDe(cliente.dni);
+    const fijosHtml = misFijos.length ? `<div class="pago-detalle" style="margin:-4px 0 14px; line-height:1.5;">Tus días fijos: ${esc(textoFijos(misFijos))}. Se te reservan solos; si un día no podés, cancelalo o cambialo por otro horario.</div>` : '';
     const otrosHtml = proximas.slice(1).map(r => `
         <div class="res-card">
           <div class="info">
             <div class="date-line">${String(r.hora).slice(0,5)} hs</div>
-            <div class="day-line">${diaCercano(r.fecha)}</div>
+            <div class="day-line">${diaCercano(r.fecha)}${esTurnoFijo(r) ? '<span class="tag-fijo">fijo</span>' : ''}</div>
           </div>
           <button class="cancel-link" data-cancelar-id="${r.id}">Cancelar</button>
         </div>`).join('');
@@ -4131,6 +4461,7 @@
     return `
       <div class="view">
         ${tituloVista('reservas', 'Mis reservas', 'Tus turnos y tu asistencia')}
+        ${fijosHtml}
         ${proximoHtml}
         ${otrosHtml}
         <div class="reservas-seccion">Tu asistencia</div>
@@ -4994,6 +5325,9 @@
         // Lo que estaba anotado con el DNI anterior se quita, para que no lo herede nadie
         await guardarMarcaPrueba(dniAnterior, false);
         await guardarCuotaEspecial(dniAnterior, null);
+        // Sus días fijos también pasan al DNI nuevo
+        const fijosViejos = fijosDe(dniAnterior);
+        if (fijosViejos.length && await guardarFijos(dniEditado, fijosViejos)) await guardarFijos(dniAnterior, []);
       }
       await refreshData();
       // Se confirma contra lo que realmente quedó guardado en la base
@@ -5023,6 +5357,21 @@
     const { error: errCliente } = await sb.from('clientes').insert(clienteJsToDb(nuevoCliente));
     if (errCliente) { errorFormCliente('No se pudo crear (' + errCliente.message + ')'); return; }
 
+    // Si estaba anotado como cliente nuevo, sus turnos pasan a su DNI
+    let notaTurnos = '';
+    if (state.altaProspecto) {
+      const codigo = state.altaProspecto;
+      const { error: errTurnos } = await sb.from('reservas').update({ dni }).eq('dni', codigo);
+      const quedan = await contarConDni('reservas', codigo);
+      if (errTurnos || quedan !== 0) {
+        console.error('No se pudieron pasar los turnos del cliente nuevo:', errTurnos);
+        notaTurnos = ' Ojo: sus turnos anotados no se pudieron pasar a su ficha; anotalo de nuevo desde Turnos.';
+      } else {
+        notaTurnos = ' Sus turnos anotados quedaron en su ficha.';
+      }
+      state.altaProspecto = null;
+    }
+
     let notaPago = '';
     const duracionPago = document.getElementById('fDuracionPago').value;
     if (duracionPago) {
@@ -5050,7 +5399,7 @@
     await refreshData();
     state.adminFormError = '';
     state.nuevoClienteAbierto = false;
-    state.adminFormNotice = `${esc(nombre)} se agregó correctamente.${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}${
+    state.adminFormNotice = `${esc(nombre)} se agregó correctamente.${notaTurnos}${notaPago}${marcarPrueba ? notaPrueba(esPrueba(dni)) : ''}${
       cuotaEspecial ? notaCuota(cuotaEspecialDe(dni) === cuotaEspecial, null) : ''}`;
     renderApp();
   }
@@ -5102,6 +5451,8 @@
       await sb.from('config').update({ valor: 0 }).eq('clave', CLAVE_PRUEBA + dni);
       await sb.from('config').delete().eq('clave', CLAVE_PRUEBA + dni);
     }
+    // Y sus días fijos, para que no se le reserven turnos a nadie
+    if (fijosDe(dni).length) await guardarFijos(dni, []);
     await refreshData();
     showToast('Cliente eliminado.' + (futuros.length ? ` Se ${futuros.length === 1 ? 'canceló su turno reservado' : 'cancelaron sus ' + futuros.length + ' turnos reservados'}.` : ''));
     renderApp();
