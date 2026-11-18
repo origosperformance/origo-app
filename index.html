@@ -173,6 +173,18 @@
   .cobro-rapido .pago-registrar { margin-top: 0; }
   .cobro-rapido select, .cobro-rapido input { width: 100%; max-width: 100%; }
 
+  /* Monto a cobrar editable */
+  .pago-monto small { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .monto-editable {
+    display: inline-flex; align-items: baseline; gap: 2px; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 22px; font-weight: 600; color: var(--text);
+    border-bottom: 2px solid var(--green); padding: 0 2px; cursor: text;
+  }
+  input[type=text].monto-input {
+    width: 7.2ch; background: transparent; border: none; padding: 0; color: var(--text); text-align: right;
+    font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 22px; font-weight: 600; outline: none; border-radius: 0;
+  }
+  .monto-diff { color: var(--amber); min-height: 0; margin-top: 2px; }
+
   /* Inicio: clientes que no vienen */
   .novienen-card { margin: 10px 0 4px; border-left: 4px solid var(--violeta); background: linear-gradient(90deg, rgba(167, 139, 250, 0.12), var(--surface) 70%); }
   .novienen-card summary { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; font-size: 14px; }
@@ -1061,7 +1073,7 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '18/11/2026 · 37';
+  const VERSION_APP = '18/11/2026 · 39';
 
   const CUPO = 4; // personas por turno
   // Control diario de los clientes PRO (wellness, TQR y RPE): apagado por ahora.
@@ -1462,7 +1474,11 @@
     const hoy = todayMidnight();
     let desdeHoy = '';
     if (base < hoy && hoy.getDate() > diasParaPagar() && habilesHastaFinDeMes(hoy) > 0) {
-      desdeHoy = `<optgroup label="Si estuvo ausente: contar desde hoy"><option value="${PREFIJO_DESDE_HOY}${DURACION_PROPORCIONAL.id}">${etiquetaProporcional(hoy)} desde hoy${conPrecio ? ' — ' + money(montoDe(precio, DURACION_PROPORCIONAL, hoy)) : ''}</option></optgroup>`;
+      // Proporcional diario y, si entran, las semanas que le quedan al mes, contando desde hoy
+      const opHoy = (d, label) => `<option value="${PREFIJO_DESDE_HOY}${d.id}">${label} desde hoy${conPrecio ? ' — ' + money(montoDe(precio, d, hoy)) : ''}</option>`;
+      const semanasHoy = Math.min(3, semanasHastaFinDeMes(hoy));
+      desdeHoy = `<optgroup label="Si estuvo ausente: contar desde hoy">${opHoy(DURACION_PROPORCIONAL, etiquetaProporcional(hoy))}${
+        [1, 2, 3].filter(n => n <= semanasHoy).map(n => opHoy(duracionPorId('fm-' + n + 's'), n === 1 ? '1 semana' : n + ' semanas')).join('')}</optgroup>`;
     }
 
     if (!sugerida) return desdeHoy ? `<optgroup label="Períodos completos">${comunes}</optgroup>${desdeHoy}` : comunes;
@@ -2797,7 +2813,9 @@
           ` : ''}
           <div class="divider"></div>
           <div class="kv-row"><span class="k">Cuota calculada</span><span class="v" id="fPrecioPreview">—</span></div>
-          ${!editing ? `<div class="kv-row"><span class="k">Pago inicial</span><span class="v" id="fPagoInicialMonto">—</span></div>
+          ${!editing ? `<div class="kv-row"><span class="k">Pago inicial</span><span class="v"><span id="fPagoInicialMonto">—</span>
+            <label class="monto-editable" id="fMontoInicialCaja" style="display:none;">$<input type="text" inputmode="numeric" class="monto-input" id="fMontoInicial" autocomplete="off"></label></span></div>
+          <div class="pago-detalle monto-diff" id="fMontoInicialDif"></div>
           <div class="pago-detalle" id="fPagoInicialDetalle" style="margin-bottom:6px;"></div>` : ''}
           <div class="error-text" id="formClienteError">${formError || ''}</div>
           <div style="display:flex; gap:10px; margin-top:10px;">
@@ -3308,7 +3326,15 @@
         const durSel = document.querySelector(`[data-duracion-dni="${dni}"]`);
         const metSel = document.querySelector(`[data-metodo-dni="${dni}"]`);
         const notaInput = document.querySelector(`[data-comprobante-dni="${dni}"]`);
-        registrarNuevoPago(dni, durSel.value, metSel.value, notaInput ? notaInput.value : '');
+        const montoInput = document.querySelector(`[data-monto-input-dni="${dni}"]`);
+        const monto = montoInput ? leerMonto(montoInput.value) : undefined;
+        if (montoInput && !(monto > 0)) {
+          const d = document.querySelector(`[data-diff-dni="${dni}"]`);
+          if (d) d.textContent = 'Escribí el monto que pagó.';
+          montoInput.focus();
+          return;
+        }
+        registrarNuevoPago(dni, durSel.value, metSel.value, notaInput ? notaInput.value : '', monto);
       };
     });
     // Al cambiar la duración se actualiza el período que cubriría el pago
@@ -3319,13 +3345,28 @@
         const el = document.querySelector(`[data-preview-dni="${dni}"]`);
         if (el) el.textContent = textoPeriodoPago(previo.base, previo.venc, previo.dur);
         const cliente = state.data.clientes.find(c => c.dni === dni);
-        const montoEl = document.querySelector(`[data-monto-dni="${dni}"]`);
-        if (montoEl && cliente) montoEl.textContent = money(montoDe(cliente.precio, previo.dur, previo.base));
+        const montoInput = document.querySelector(`[data-monto-input-dni="${dni}"]`);
+        if (montoInput && cliente) {
+          // Al cambiar el período se vuelve a poner el monto calculado
+          const calc = montoDe(cliente.precio, previo.dur, previo.base);
+          montoInput.dataset.calculado = calc;
+          montoInput.value = formatoMiles(calc);
+          const d = document.querySelector(`[data-diff-dni="${dni}"]`);
+          if (d) d.textContent = '';
+        }
       };
+    });
+    // Monto escrito a mano: se muestra la diferencia con lo calculado
+    root.querySelectorAll('[data-monto-input-dni]').forEach(inp => {
+      inp.oninput = () => {
+        const d = document.querySelector(`[data-diff-dni="${inp.dataset.montoInputDni}"]`);
+        if (d) d.textContent = textoDiferencia(leerMonto(inp.value), Number(inp.dataset.calculado));
+      };
+      inp.onblur = () => { const n = leerMonto(inp.value); if (n != null) inp.value = formatoMiles(n); };
     });
     // Deshacer un pago borra un registro de plata: pide un segundo toque
     root.querySelectorAll('[data-eliminar-pago]').forEach(btn => {
-      btn.onclick = () => confirmarEnDosToques(btn, 'Tocá de nuevo para deshacerlo', () => eliminarPago(btn.dataset.eliminarPago));
+      btn.onclick = () => confirmarEnDosToques(btn, 'Tocá de nuevo para borrarlo y volver a cargarlo', () => eliminarPago(btn.dataset.eliminarPago));
     });
   }
 
@@ -3462,14 +3503,17 @@
       .sort((a, b) => (b.fechaVencimiento + b.fechaPago).localeCompare(a.fechaVencimiento + a.fechaPago));
   }
 
-  async function registrarNuevoPago(dni, duracionId, metodoPago, comprobante) {
+  async function registrarNuevoPago(dni, duracionId, metodoPago, comprobante, montoEscrito) {
     const cliente = state.data.clientes.find(c => c.dni === dni);
     if (!cliente) return;
     const { dur, base, venc } = periodoNuevoPago(state.data, dni, duracionId);
     if (!dur) return;
     const diasReales = Math.round((venc - base) / 86400000);
-    const monto = montoDe(cliente.precio, dur, base);
-    const nota = String(comprobante || '').trim().slice(0, 80);
+    const calculado = montoDe(cliente.precio, dur, base);
+    const monto = montoEscrito > 0 ? montoEscrito : calculado;
+    const ajustado = monto !== calculado;
+    const notaLibre = String(comprobante || '').trim().slice(0, 80);
+    const nota = ajustado ? ('[calc:' + calculado + '] ' + notaLibre).trim() : notaLibre;
     const nuevoPago = {
       id: 'pago-' + dni + '-' + Date.now(),
       dni, fechaPago: isoDate(ahora()), duracionId: dur.id, dias: diasReales, monto, metodoPago,
@@ -3488,7 +3532,7 @@
     if (error) { showToast('No se pudo registrar el pago' + (error.message ? ': ' + error.message : '.')); console.error(error); return; }
     await refreshData();
     showToast(comprobanteNoGuardado
-      ? 'Pago registrado. El comprobante no se pudo guardar.'
+      ? (ajustado ? 'Pago registrado por ' + money(monto) + '. No se pudo guardar la marca de ajuste ni el comprobante.' : 'Pago registrado. El comprobante no se pudo guardar.')
       : 'Pago registrado: ' + dur.label + ' · vence ' + formatFechaCorta(isoDate(venc)));
     renderApp();
   }
@@ -3525,7 +3569,7 @@
         filas.push([
           formatFecha(p.fechaPago), c ? c.nombre : '(cliente eliminado)', p.dni, c ? c.plan : '',
           dur ? dur.label : (p.duracionId || ''), p.monto, p.metodoPago || '',
-          formatFecha(inicioPeriodo(p)), formatFecha(p.fechaVencimiento), p.comprobante || '',
+          formatFecha(inicioPeriodo(p)), formatFecha(p.fechaVencimiento), textoComprobante(p),
         ]);
       });
     const csv = '\uFEFF' + filas.map(f => f.map(celda).join(';')).join('\r\n');
@@ -3542,6 +3586,30 @@
   }
 
   // Lista de pagos de un cliente (se usa en Cuotas del administrador y en el perfil del cliente)
+  // ---- Monto ajustado a mano ----
+  // Al registrar un pago se puede cambiar el monto que calculó la app. En ese
+  // caso el comprobante del pago empieza con '[calc:<monto calculado>]', para
+  // que en el historial se vea que fue un ajuste y cuánto daba la cuenta.
+  const MARCA_AJUSTE = /^\[calc:(\d+)\]\s*/;
+  function partesComprobante(p) {
+    const t = String(p.comprobante || '');
+    const m = MARCA_AJUSTE.exec(t);
+    return { calculado: m ? parseInt(m[1], 10) : null, nota: t.replace(MARCA_AJUSTE, '') };
+  }
+  function textoComprobante(p) {
+    const { calculado, nota } = partesComprobante(p);
+    return [calculado != null ? 'Ajustado a mano (calculado: ' + money(calculado) + ')' : '', nota ? 'Comprobante: ' + nota : ''].filter(Boolean).join(' · ');
+  }
+  function leerMonto(t) { const n = parseInt(String(t || '').replace(/[^\d]/g, ''), 10); return isNaN(n) ? null : n; }
+  function formatoMiles(n) { return (n || 0).toLocaleString('es-AR'); }
+  // Texto bajo la casilla del monto: si se cambió, cuánto más o menos que lo calculado
+  function textoDiferencia(monto, calculado) {
+    if (monto == null) return 'Escribí el monto que pagó.';
+    const dif = monto - calculado;
+    if (!dif) return '';
+    return 'Ajustado a mano: ' + money(Math.abs(dif)) + (dif < 0 ? ' menos' : ' más') + ' que lo calculado (' + money(calculado) + ').';
+  }
+
   function filasHistorialPagos(pagos, conDeshacer) {
     return pagos.map((p, i) => {
       const dur = duracionPorId(p.duracionId);
@@ -3549,7 +3617,7 @@
         <div class="pago-fila">
           <div>
             <div class="p1">${formatFecha(p.fechaPago)} · ${dur ? dur.label : ''}</div>
-            <div class="p2">${esc(p.metodoPago || '')} · cubre del ${formatFechaCorta(inicioPeriodo(p))} al ${formatFechaCorta(p.fechaVencimiento)}${p.comprobante ? '<br>Comprobante: ' + esc(p.comprobante) : ''}${(conDeshacer && i === 0) ? `<br><button class="cancel-link" data-eliminar-pago="${p.id}">Deshacer este pago</button>` : ''}</div>
+            <div class="p2">${esc(p.metodoPago || '')} · cubre del ${formatFechaCorta(inicioPeriodo(p))} al ${formatFechaCorta(p.fechaVencimiento)}${p.comprobante ? '<br>' + esc(textoComprobante(p)) : ''}${(conDeshacer && i === 0) ? `<br><button class="cancel-link" data-eliminar-pago="${p.id}" style="color:var(--amber);">Corregir este pago (lo borra para volver a cargarlo)</button>` : ''}</div>
           </div>
           <span class="monto">${money(p.monto)}</span>
         </div>`;
@@ -3560,8 +3628,11 @@
     const { error } = await sb.from('pagos').delete().eq('id', pagoId);
     if (error) { showToast('No se pudo eliminar el pago.'); console.error(error); return; }
     await refreshData();
-    showToast('Pago eliminado');
+    showToast('Pago borrado. Cargalo de nuevo con la opción que corresponde.');
     renderApp();
+    // Se lleva la pantalla al formulario para volver a cargarlo
+    const sel = document.querySelector('.duracion-select');
+    if (sel) sel.scrollIntoView({ block: 'center' });
   }
 
   async function guardarPrecioPlan(id, valorTexto) {
@@ -3641,7 +3712,10 @@
             </select>
           </div>
           <input type="text" class="pago-nota-input" data-comprobante-dni="${c.dni}" maxlength="80" placeholder="Comprobante o nota (opcional)" autocomplete="off">
-          <div class="pago-monto"><span>A cobrar</span><b data-monto-dni="${c.dni}">${money(montoDe(c.precio, previo.dur, previo.base))}</b></div>
+          <div class="pago-monto"><span>Cobrado <small>(podés cambiarlo)</small></span>
+            <label class="monto-editable">$<input type="text" inputmode="numeric" class="monto-input" data-monto-input-dni="${c.dni}"
+              data-calculado="${montoDe(c.precio, previo.dur, previo.base)}" value="${formatoMiles(montoDe(c.precio, previo.dur, previo.base))}" autocomplete="off"></label></div>
+          <div class="pago-detalle monto-diff" data-diff-dni="${c.dni}"></div>
           <div class="pago-preview" data-preview-dni="${c.dni}" style="margin-top:2px;">${textoPeriodoPago(previo.base, previo.venc, previo.dur)}</div>
           <button class="slot-btn" data-registrar-pago="${c.dni}" style="width:100%; margin-top:8px;">Registrar pago</button>`;
   }
@@ -5546,18 +5620,35 @@
       const detalleEl = document.getElementById('fPagoInicialDetalle');
       if (durSel && montoEl && detalleEl) {
         const dur = durSel.value ? duracionPorId(durSel.value) : null;
+        const caja = document.getElementById('fMontoInicialCaja');
+        const inp = document.getElementById('fMontoInicial');
+        const dif = document.getElementById('fMontoInicialDif');
+        if (dif) dif.textContent = '';
         if (!dur || !precio) {
           montoEl.textContent = dur ? '—' : 'Sin pago';
+          montoEl.style.display = '';
+          if (caja) caja.style.display = 'none';
           detalleEl.textContent = '';
         } else {
           const hoy = todayMidnight();
-          montoEl.textContent = money(montoDe(precio, dur, todayMidnight()));
+          const calc = montoDe(precio, dur, todayMidnight());
+          // El monto calculado queda en la casilla; se puede cambiar a mano
+          montoEl.style.display = 'none';
+          if (caja && inp) { caja.style.display = ''; inp.dataset.calculado = calc; inp.value = formatoMiles(calc); }
           detalleEl.textContent = textoPeriodoPago(hoy, calcularVencimiento(hoy, dur), dur);
         }
       }
     };
     planSel.onchange = updatePreview;
     diasSel.onchange = updatePreview;
+    const montoInicial = document.getElementById('fMontoInicial');
+    if (montoInicial) {
+      montoInicial.oninput = () => {
+        const dif = document.getElementById('fMontoInicialDif');
+        if (dif) dif.textContent = textoDiferencia(leerMonto(montoInicial.value), Number(montoInicial.dataset.calculado));
+      };
+      montoInicial.onblur = () => { const n = leerMonto(montoInicial.value); if (n != null) montoInicial.value = formatoMiles(n); };
+    }
     const durPagoSel = document.getElementById('fDuracionPago');
     if (durPagoSel) durPagoSel.onchange = updatePreview;
     if (especialInput) especialInput.oninput = updatePreview;
@@ -5897,13 +5988,18 @@
       hoy.setHours(0, 0, 0, 0);
       const venc = calcularVencimiento(hoy, dur);
       const diasReales = Math.round((venc - hoy) / 86400000);
-      const monto = montoDe(precio, dur, hoy);
+      const calculado = montoDe(precio, dur, hoy);
+      const escrito = leerMonto((document.getElementById('fMontoInicial') || {}).value);
+      const monto = escrito > 0 ? escrito : calculado;
       const nuevoPago = {
         id: 'pago-' + dni + '-' + Date.now(),
         dni, fechaPago: isoDate(hoy), duracionId: dur.id, dias: diasReales, monto, metodoPago,
         fechaVencimiento: isoDate(venc),
+        comprobante: monto !== calculado ? '[calc:' + calculado + ']' : null,
       };
-      const { error: errPago } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+      let { error: errPago } = await sb.from('pagos').insert(pagoJsToDb(nuevoPago));
+      // Si la base no tiene la columna del comprobante, se registra igual sin la marca de ajuste
+      if (errPago && nuevoPago.comprobante) ({ error: errPago } = await sb.from('pagos').insert(pagoJsToDb({ ...nuevoPago, comprobante: null })));
       notaPago = errPago
         ? ' Ojo: el pago inicial no se pudo registrar, cargalo desde su ficha.'
         : ` Pago inicial registrado (${dur.label}, ${money(monto)}, vence ${formatFechaCorta(isoDate(venc))}).`;
