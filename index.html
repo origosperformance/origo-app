@@ -1073,13 +1073,13 @@
 
   // Versión de la app: se muestra al pie de administración para saber qué
   // archivo está publicado. Cambiarla cada vez que se sube un index.html nuevo.
-  const VERSION_APP = '18/11/2026 · 39';
+  const VERSION_APP = '20/11/2026 · 42';
 
   const CUPO = 4; // personas por turno
   // Control diario de los clientes PRO (wellness, TQR y RPE): apagado por ahora.
   // El plan PRO sigue igual; solo se ocultan "Mi día", la pestaña Pro y la
   // tarjeta de la ficha. Para volver a usarlo alcanza con poner true.
-  const CONTROL_PRO_ACTIVO = false;
+  const CONTROL_PRO_ACTIVO = true;
   const MAX_TURNOS_POR_DIA = 2;
   // Minutos de tolerancia después de la hora de inicio durante los que un turno
   // todavía se puede reservar/cancelar. 0 = se cierra en punto.
@@ -1298,7 +1298,7 @@
   // seguidos se pisan (el de 8:00 y el de 8:30 comparten media hora): cada uno
   // tiene su propio cupo, pero un cliente no puede anotarse en dos que se pisen.
   const PRIMER_TURNO = '08:00';
-  const ULTIMO_TURNO = '20:00';
+  const ULTIMO_TURNO = '19:00'; // último horario que se puede reservar
   const MINUTOS_ENTRE_TURNOS = 30;
   const DURACION_TURNO_MIN = 60;
   function minutosDe(hora) {
@@ -1310,6 +1310,13 @@
   }
   const HORARIOS = [];
   for (let m = minutosDe(PRIMER_TURNO); m <= minutosDe(ULTIMO_TURNO); m += MINUTOS_ENTRE_TURNOS) HORARIOS.push(horaDeMinutos(m));
+  // Los horarios de la grilla más los de turnos que ya estaban reservados fuera
+  // de ella (por ejemplo, a las 19 de antes de achicar el horario), para que
+  // administración los siga viendo y pueda marcarlos o cancelarlos.
+  function horariosConExtras(reservasDelDia) {
+    const extras = reservasDelDia.map(r => String(r.hora).slice(0, 5)).filter(h => !HORARIOS.includes(h));
+    return [...new Set(HORARIOS.concat(extras))].sort();
+  }
   // true si dos turnos distintos del mismo día se pisan en el tiempo
   function seSuperponen(hora1, hora2) {
     return hora1 !== hora2 && Math.abs(minutosDe(hora1) - minutosDe(hora2)) < DURACION_TURNO_MIN;
@@ -1683,6 +1690,7 @@
     return { desde: hhmm(Math.floor(v / 10000)), hasta: hhmm(v % 10000) };
   }
   function horarioAbierto(fechaIso, hora) {
+    if (!HORARIOS.includes(String(hora).slice(0, 5))) return false; // fuera del horario de funcionamiento
     const e = horarioEspecial(fechaIso);
     if (!e) return true;
     if (e.cerrado) return false;
@@ -2605,7 +2613,7 @@
     const hoyActivas = reservas.filter(r => r.fecha === hoy && r.estado !== 'cancelado');
     // un horario sigue "en curso" mientras no pasó la duración del turno
     const enCurso = (hora) => turnoYaEmpezo(hoy, hora) && !turnoYaEmpezo(hoy, horaDeMinutos(minutosDe(hora) + DURACION_TURNO_MIN));
-    const horasAgenda = HORARIOS.filter(h => hoyActivas.some(r => String(r.hora).slice(0, 5) === h) && (!turnoYaEmpezo(hoy, h) || enCurso(h)));
+    const horasAgenda = horariosConExtras(hoyActivas).filter(h => hoyActivas.some(r => String(r.hora).slice(0, 5) === h) && (!turnoYaEmpezo(hoy, h) || enCurso(h)));
     const agendaTitulo = esFinde ? 'Hoy no hay turnos' : horasAgenda.length ? 'Próximos turnos de hoy' : 'Hoy';
     const agendaHtml = esFinde ? '' : `
         ${horasAgenda.length ? `<div class="agenda">${horasAgenda.slice(0, AGENDA_MAX).map(h => {
@@ -4152,8 +4160,9 @@
           `<button class="libre-chip ${turnoYaEmpezo(fecha, h) ? 'pasado' : ''}" data-anotar-hora="${h}" aria-label="Anotar a las ${h}">${h}</button>`).join('')}</div>`;
         libres = [];
       };
-      HORARIOS.forEach(h => {
-        const conGente = delDia.some(r => r.hora === h);
+      horariosConExtras(delDia).forEach(h => {
+        const conGente = delDia.some(r => String(r.hora).slice(0, 5) === h);
+        if (!HORARIOS.includes(h)) { volcar(); html += fila(h); return; } // turno viejo fuera del horario
         if (!conGente && state.anotarEn !== h) {
           if (horarioAbierto(fecha, h)) libres.push(h);
           return;
@@ -4222,7 +4231,8 @@
     // Turnos que quedaron fuera del horario: avisar y cancelar
     const fuera = turnosFueraDeHorario(data, fecha);
     if (fuera.length && !ed) {
-      const que = esp && esp.cerrado ? 'ORIGO va a estar cerrado' : esp ? 'abrimos solo de ' + esp.desde + ' a ' + esp.hasta : '';
+      const que = esp && esp.cerrado ? 'ORIGO va a estar cerrado' : esp ? 'abrimos solo de ' + esp.desde + ' a ' + esp.hasta
+        : 'el último turno es a las ' + ULTIMO_TURNO;
       html += `
         <div class="cuota-card pendiente-card" style="margin-top:8px;">
           <div class="cuota-nombre" style="margin-bottom:6px;">${fuera.length === 1 ? '1 turno quedó' : fuera.length + ' turnos quedaron'} fuera de horario</div>
